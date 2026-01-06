@@ -2,8 +2,8 @@
   "version": "2.2.0",
   "name": "BONZOOKAA!",
   "player": {
-    "baseHP": 100,
-    "baseDamage": 6,
+    "baseHP": 500,
+    "baseDamage": 15,
     "baseSpeed": 220,
     "baseFireRate": 4.5,
     "baseCritChance": 5,
