@@ -71,7 +71,7 @@
   },
   "exploration": {
     "bossEveryNZones": 10,
-    "mapScale": 3.0,
+    "mapScale": 2.0,
     "enemyDensityMult": 0.55,
     "eliteDensityMult": 0.5,
     "maxEnemySpawnsPerZone": 150,
