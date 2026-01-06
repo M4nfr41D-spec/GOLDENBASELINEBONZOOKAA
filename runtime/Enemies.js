@@ -23,6 +23,13 @@ export const Enemies = {
     const eliteMult = cfg.eliteHPMult || 2.5;
     const bossMult = cfg.bossHPMult || 8;
     
+    // Exploration tuning (slower fire, smaller aggro, etc.) is driven by config.json
+    const tune = State.data.config?.exploration || {};
+    const fireMult = (typeof tune.enemyFireIntervalMult === 'number') ? tune.enemyFireIntervalMult : 1.0;
+
+    const baseInterval = enemyData.shootInterval || (isBoss ? 0.6 : (isElite ? 1.2 : 2.5));
+    const shootInterval = Math.max(0.35, baseInterval * fireMult);
+
     const enemy = {
       id: 'e_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
       type: type,
@@ -42,8 +49,8 @@ export const Enemies = {
       isBoss: isBoss,
       pattern: enemyData.pattern,
       patternTime: 0,
-      shootTimer: 1 + Math.random() * 2,
-      shootInterval: enemyData.shootInterval || (isBoss ? 0.6 : (isElite ? 1.2 : 2.5)),
+      shootTimer: shootInterval * (0.5 + Math.random() * 0.8),
+      shootInterval: shootInterval,
       dead: false
     };
     
@@ -185,6 +192,8 @@ export const Enemies = {
   // Exploration AI: patrol at spawn point, aggro in range, return when player leaves
   updateExplorationAI(e, dt, zone) {
     const p = State.player;
+    const tune = State.data.config?.exploration || {};
+    const aggroMult = (typeof tune.enemyAggroRangeMult === 'number') ? tune.enemyAggroRangeMult : 1.0;
 
     // Lazy init for safety (should be set in World.spawnEnemy)
     if (e.homeX == null || e.homeY == null) {
@@ -197,7 +206,10 @@ export const Enemies = {
     if (e.patrolAngle == null) e.patrolAngle = Math.random() * Math.PI * 2;
     if (!e.patrolDir) e.patrolDir = Math.random() < 0.5 ? -1 : 1;
     if (e.patrolTimer == null) e.patrolTimer = 0;
-    if (!e.aggroRange) e.aggroRange = e.isBoss ? 750 : (e.isElite ? 520 : 420);
+    if (!e.aggroRange) {
+      const baseAggro = e.isBoss ? 550 : (e.isElite ? 420 : 340);
+      e.aggroRange = baseAggro * aggroMult;
+    }
     if (!e.attackRange) e.attackRange = e.aggroRange;
     if (!e.disengageRange) e.disengageRange = e.aggroRange * 1.65;
     if (!e.leashRange) e.leashRange = Math.max(e.aggroRange * 2.2, e.patrolRadius * 5);

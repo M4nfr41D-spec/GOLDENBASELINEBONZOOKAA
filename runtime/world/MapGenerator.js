@@ -47,6 +47,12 @@ export const MapGenerator = {
     if (modSet.has('MINEFIELD')) obstacleDensity = scale(obstacleDensity, 1.15);
     let crampedMult = 1.0;
     if (modSet.has('CRAMPED_ZONE')) crampedMult = 0.85;
+
+    // Global exploration tuning overrides (config.json)
+    // These exist to keep the engine testable (lower density / calmer combat) without touching act data.
+    const tune = State.data.config?.exploration || {};
+    if (typeof tune.enemyDensityMult === 'number') enemyDensity *= tune.enemyDensityMult;
+    if (typeof tune.eliteDensityMult === 'number') eliteDensity *= tune.eliteDensityMult;
     
     // Zone dimensions
     let width = pickRange(cfg.width, 1500, 3000);
@@ -207,10 +213,16 @@ export const MapGenerator = {
   // Enemy spawn positions
   generateEnemySpawns(rng, pool, density, w, h, spawn, exit) {
     const spawns = [];
-    const count = Math.floor(w * h * density);
-    const minDistFromSpawn = 300;
-    const minDistFromExit = 200;
-    const minDistBetween = 150;
+    // Density is expressed as spawns per pixel^2.
+    // We hard-cap the final amount to avoid runaway zones and keep perf + readability stable.
+    const tune = State.data.config?.exploration || {};
+    const maxSpawns = (typeof tune.maxEnemySpawnsPerZone === 'number') ? tune.maxEnemySpawnsPerZone : 120;
+    const countRaw = Math.floor(w * h * density);
+    const count = Math.max(0, Math.min(countRaw, maxSpawns));
+
+    const minDistFromSpawn = (typeof tune.enemySpawnMinDistFromSpawn === 'number') ? tune.enemySpawnMinDistFromSpawn : 300;
+    const minDistFromExit  = (typeof tune.enemySpawnMinDistFromExit === 'number') ? tune.enemySpawnMinDistFromExit : 200;
+    const minDistBetween   = (typeof tune.enemySpawnMinDistBetween === 'number') ? tune.enemySpawnMinDistBetween : 150;
     
     for (let i = 0; i < count * 3 && spawns.length < count; i++) {
       const x = rng.range(100, w - 100);
@@ -250,7 +262,10 @@ export const MapGenerator = {
   // Elite spawn positions
   generateEliteSpawns(rng, pool, density, w, h) {
     const spawns = [];
-    const count = Math.max(1, Math.floor(w * h * density));
+    const tune = State.data.config?.exploration || {};
+    const maxElites = (typeof tune.maxEliteSpawnsPerZone === 'number') ? tune.maxEliteSpawnsPerZone : 8;
+    const countRaw = Math.floor(w * h * density);
+    const count = Math.max(1, Math.min(countRaw, maxElites));
     
     for (let i = 0; i < count; i++) {
       spawns.push({

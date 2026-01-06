@@ -199,8 +199,8 @@ const Game = {
     // Update camera to follow player
     Camera.update(dt, this.screenW, this.screenH);
     
-    // Update world (proximity spawning)
-    World.update(dt);
+    // Update world (view-based prewarm spawning to avoid pop-in)
+    World.update(dt, this.screenW, this.screenH);
     
     // Update player
     Player.update(dt, this.canvas, true); // true = exploration mode

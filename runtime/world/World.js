@@ -18,9 +18,24 @@ export const World = {
   zoneIndex: 0,
   
   // Spawning config
-  spawnRadius: 600,      // Distance to trigger spawn
-  despawnRadius: 1200,   // Distance to despawn (performance)
+  // Legacy distance-based spawning (kept as fallback)
+  spawnRadius: 600,
+  despawnRadius: 1200,
+
+  // View-based spawning (preferred): spawns become active before they enter the camera view
+  spawnViewMargin: 520,      // pixels beyond viewport to prewarm spawns
+  despawnViewMargin: 1800,   // pixels beyond viewport to allow despawn
   activeEnemies: [],     // Currently active enemies from spawns
+
+  // Check if a world point is within (camera view + margin)
+  isInView(x, y, camX, camY, screenW, screenH, margin) {
+    return (
+      x >= camX - margin &&
+      x <= camX + screenW + margin &&
+      y >= camY - margin &&
+      y <= camY + screenH + margin
+    );
+  },
   
   // Initialize world with act config
   async init(actId, seed = null) {
@@ -99,25 +114,39 @@ export const World = {
     this.bossSpawned = false;
   },
   
-  // Update - handle proximity spawning
-  update(dt) {
+  // Update - handle view-based spawning (and fallback proximity spawning)
+  update(dt, screenW = 800, screenH = 600) {
     if (!this.currentZone) return;
-    
+
     const player = State.player;
+    const tune = State.data.config?.exploration || {};
+    const spawnMargin = (typeof tune.spawnViewMargin === 'number') ? tune.spawnViewMargin : this.spawnViewMargin;
+    const despawnMargin = (typeof tune.despawnViewMargin === 'number') ? tune.despawnViewMargin : this.despawnViewMargin;
+
+    // Use camera target (less laggy) for spawn checks.
+    const camX = (Camera.targetX != null) ? Camera.targetX : Camera.getX();
+    const camY = (Camera.targetY != null) ? Camera.targetY : Camera.getY();
     
     // Check enemy spawns
     for (const spawn of this.currentZone.enemySpawns) {
       if (spawn.killed) continue;
       
       const dist = Math.hypot(player.x - spawn.x, player.y - spawn.y);
-      
-      // Spawn if player close
-      if (!spawn.active && dist < this.spawnRadius) {
+
+      // Preferred: spawn when the spawn point approaches the camera view.
+      // This prevents "enemies popping into existence" right next to the ship.
+      const shouldSpawnByView = this.isInView(spawn.x, spawn.y, camX, camY, screenW, screenH, spawnMargin);
+      if (!spawn.active && shouldSpawnByView) {
+        this.spawnEnemy(spawn, false);
+      } else if (!spawn.active && dist < this.spawnRadius) {
+        // Fallback for edge cases (very small screens / extreme camera settings)
         this.spawnEnemy(spawn, false);
       }
       
       // Despawn if too far (and not engaged)
-      if (spawn.active && dist > this.despawnRadius) {
+      // Despawn when far outside view (and the enemy has returned home)
+      const shouldDespawnByView = !this.isInView(spawn.x, spawn.y, camX, camY, screenW, screenH, despawnMargin);
+      if (spawn.active && (shouldDespawnByView || dist > this.despawnRadius)) {
         // Only despawn when the enemy is effectively "idle" at home.
         // If it was engaged, force a return so it doesn't vanish mid-behavior.
         const enemy = State.enemies.find(e => e.id === spawn.enemyId);
@@ -140,9 +169,28 @@ export const World = {
       if (spawn.killed) continue;
       
       const dist = Math.hypot(player.x - spawn.x, player.y - spawn.y);
-      
-      if (!spawn.active && dist < this.spawnRadius) {
+
+      const shouldSpawnByView = this.isInView(spawn.x, spawn.y, camX, camY, screenW, screenH, spawnMargin);
+      if (!spawn.active && shouldSpawnByView) {
         this.spawnEnemy(spawn, true);
+      } else if (!spawn.active && dist < this.spawnRadius) {
+        this.spawnEnemy(spawn, true);
+      }
+
+      // Despawn elites when far outside view (only once they returned home)
+      const shouldDespawnByView = !this.isInView(spawn.x, spawn.y, camX, camY, screenW, screenH, despawnMargin);
+      if (spawn.active && (shouldDespawnByView || dist > this.despawnRadius)) {
+        const enemy = State.enemies.find(e => e.id === spawn.enemyId);
+        if (enemy) {
+          if (enemy.aiState === 'aggro') enemy.aiState = 'return';
+          const distHome = Math.hypot(enemy.x - spawn.x, enemy.y - spawn.y);
+          const homeThreshold = enemy.returnThreshold || 60;
+          if (enemy.aiState !== 'aggro' && distHome <= homeThreshold) {
+            this.despawnEnemy(spawn);
+          }
+        } else {
+          this.despawnEnemy(spawn);
+        }
       }
     }
     
@@ -150,8 +198,12 @@ export const World = {
     if (this.currentZone.bossSpawn && !this.currentZone.bossSpawn.killed) {
       const spawn = this.currentZone.bossSpawn;
       const dist = Math.hypot(player.x - spawn.x, player.y - spawn.y);
-      
-      if (!spawn.active && dist < this.spawnRadius * 1.5) {
+
+      const bossMargin = spawnMargin * 1.25;
+      const shouldSpawnByView = this.isInView(spawn.x, spawn.y, camX, camY, screenW, screenH, bossMargin);
+      if (!spawn.active && shouldSpawnByView) {
+        this.spawnBoss(spawn);
+      } else if (!spawn.active && dist < this.spawnRadius * 1.5) {
         this.spawnBoss(spawn);
       }
     }
@@ -180,6 +232,8 @@ export const World = {
   // Spawn regular enemy
   spawnEnemy(spawn, isElite = false) {
     const { Enemies } = State.modules;
+    const tune = State.data.config?.exploration || {};
+    const aggroMult = (typeof tune.enemyAggroRangeMult === 'number') ? tune.enemyAggroRangeMult : 1.0;
     
     // Calculate level based on player
     const playerLvl = State.meta.level || 1;
@@ -212,7 +266,8 @@ export const World = {
     enemy.wanderTimer = 0;
 
     // Engagement envelope (tuned for exploration)
-    enemy.aggroRange = spawn.aggroRange || (isElite ? 520 : 420);
+    const baseAggro = spawn.aggroRange || (isElite ? 420 : 340);
+    enemy.aggroRange = baseAggro * aggroMult;
     enemy.attackRange = spawn.attackRange || enemy.aggroRange;
     enemy.disengageRange = spawn.disengageRange || enemy.aggroRange * 1.65;
     enemy.leashRange = spawn.leashRange || Math.max(enemy.aggroRange * 2.2, patrolRadius * 5);
@@ -234,6 +289,8 @@ export const World = {
   // Spawn boss
   spawnBoss(spawn) {
     const { Enemies } = State.modules;
+    const tune = State.data.config?.exploration || {};
+    const aggroMult = (typeof tune.enemyAggroRangeMult === 'number') ? tune.enemyAggroRangeMult : 1.0;
     
     const playerLvl = State.meta.level || 1;
     const bossLvl = playerLvl + Math.floor(Math.random() * 6); // +0 to +5
@@ -252,7 +309,8 @@ export const World = {
     enemy.patrolDir = 1;
     enemy.patrolTimer = 0;
 
-    enemy.aggroRange = spawn.aggroRange || 750;
+    const baseAggro = spawn.aggroRange || 550;
+    enemy.aggroRange = baseAggro * aggroMult;
     enemy.attackRange = spawn.attackRange || enemy.aggroRange;
     enemy.disengageRange = spawn.disengageRange || enemy.aggroRange * 1.5;
     enemy.leashRange = spawn.leashRange || Math.max(enemy.aggroRange * 2.0, enemy.patrolRadius * 6);

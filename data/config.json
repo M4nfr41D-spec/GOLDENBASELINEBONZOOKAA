@@ -1,7 +1,6 @@
 {
   "version": "2.2.0",
   "name": "BONZOOKAA!",
-  
   "player": {
     "baseHP": 100,
     "baseDamage": 6,
@@ -11,15 +10,12 @@
     "baseCritDamage": 150,
     "basePickupRadius": 60,
     "bulletSpeed": 800,
-    
     "acceleration": 3000,
     "friction": 0.65,
     "deadzone": 0.1,
-    
     "shieldRegenRate": 5,
     "shieldRegenDelay": 3
   },
-  
   "progression": {
     "baseXP": 100,
     "xpScale": 1.15,
@@ -27,7 +23,6 @@
     "skillPerLevel": 1,
     "statPerLevel": 3
   },
-  
   "waves": {
     "vendorInterval": 5,
     "vendorStart": 3,
@@ -35,32 +30,27 @@
     "eliteChance": 0.12,
     "baseEnemyCount": 4,
     "enemyCountScale": 0.6,
-    
     "scaleMode": "exponential",
     "scaleBase": 1.12,
     "scaleLinear": 0.08,
     "eliteHPMult": 2.5,
     "bossHPMult": 8
   },
-  
   "economy": {
     "scrapPerKill": 5,
     "cellsPerKill": 3,
     "bossScrapMult": 10,
     "eliteScrapMult": 3
   },
-  
   "loot": {
     "baseDropChance": 0.05,
     "bossDropChance": 1.0,
-    "eliteDropChance": 0.30
+    "eliteDropChance": 0.3
   },
-  
   "stash": {
     "baseSlots": 56,
     "maxSlots": 200
   },
-  
   "effects": {
     "damageNumbers": {
       "baseSize": 16,
@@ -78,5 +68,18 @@
       "critIntensity": 4,
       "bossIntensity": 10
     }
+  },
+  "exploration": {
+    "enemyDensityMult": 0.35,
+    "eliteDensityMult": 0.5,
+    "maxEnemySpawnsPerZone": 90,
+    "maxEliteSpawnsPerZone": 6,
+    "enemySpawnMinDistBetween": 190,
+    "enemySpawnMinDistFromSpawn": 360,
+    "enemySpawnMinDistFromExit": 240,
+    "spawnViewMargin": 520,
+    "despawnViewMargin": 1800,
+    "enemyAggroRangeMult": 0.7,
+    "enemyFireIntervalMult": 1.75
   }
 }
