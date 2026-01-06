@@ -1,0 +1,109 @@
+{
+  "act1": {
+    "name": "Asteroid Belt",
+    "description": "Navigate through the treacherous asteroid fields",
+    "biome": "asteroid",
+    "unlocked": true,
+    "zones": 4,
+    "generation": {
+      "width": [1800, 2500],
+      "height": [1800, 2500],
+      "enemyDensity": 0.0004,
+      "eliteDensity": 0.00008,
+      "obstacleDensity": 0.00025
+    },
+    "enemies": {
+      "pool": ["grunt", "scout"],
+      "elitePool": ["commander"]
+    },
+    "boss": {
+      "type": "sentinel",
+      "arenaWidth": 1200,
+      "arenaHeight": 1000
+    },
+    "parallax": {
+      "bgColor": "#080810",
+      "nebula": {
+        "enabled": true,
+        "count": 5,
+        "color": "#221144"
+      }
+    },
+    "rewards": {
+      "completionScrap": 500,
+      "unlocks": ["act2"]
+    }
+  },
+  
+  "act2": {
+    "name": "Nebula Depths",
+    "description": "Descend into the toxic nebula clouds",
+    "biome": "nebula",
+    "unlocked": false,
+    "zones": 5,
+    "generation": {
+      "width": [2000, 3000],
+      "height": [2000, 3000],
+      "enemyDensity": 0.0005,
+      "eliteDensity": 0.0001,
+      "obstacleDensity": 0.0002
+    },
+    "enemies": {
+      "pool": ["grunt", "scout", "diver"],
+      "elitePool": ["commander", "sniper"]
+    },
+    "boss": {
+      "type": "collector",
+      "arenaWidth": 1400,
+      "arenaHeight": 1100
+    },
+    "parallax": {
+      "bgColor": "#100818",
+      "nebula": {
+        "enabled": true,
+        "count": 8,
+        "color": "#442266"
+      }
+    },
+    "rewards": {
+      "completionScrap": 1000,
+      "unlocks": ["act3"]
+    }
+  },
+  
+  "act3": {
+    "name": "The Void",
+    "description": "Face the darkness at the edge of known space",
+    "biome": "void",
+    "unlocked": false,
+    "zones": 6,
+    "generation": {
+      "width": [2500, 3500],
+      "height": [2500, 3500],
+      "enemyDensity": 0.0006,
+      "eliteDensity": 0.00012,
+      "obstacleDensity": 0.00015
+    },
+    "enemies": {
+      "pool": ["scout", "diver", "tank"],
+      "elitePool": ["commander", "sniper", "berserker"]
+    },
+    "boss": {
+      "type": "harbinger",
+      "arenaWidth": 1600,
+      "arenaHeight": 1300
+    },
+    "parallax": {
+      "bgColor": "#050508",
+      "nebula": {
+        "enabled": true,
+        "count": 3,
+        "color": "#220033"
+      }
+    },
+    "rewards": {
+      "completionScrap": 2000,
+      "unlocks": []
+    }
+  }
+}

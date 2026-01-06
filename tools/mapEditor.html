@@ -1,0 +1,629 @@
+<!-- Copyright (c) Manfred Foissner. All rights reserved. -->
+<!-- License: See LICENSE.txt in the project root. -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>BONZOOKAA Map Editor</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #1a1a2e;
+      color: #eee;
+      display: flex;
+      height: 100vh;
+    }
+    
+    /* Sidebar */
+    .sidebar {
+      width: 300px;
+      background: #16213e;
+      padding: 20px;
+      overflow-y: auto;
+    }
+    .sidebar h1 {
+      color: #00ffaa;
+      font-size: 18px;
+      margin-bottom: 20px;
+    }
+    .panel {
+      background: #1a1a2e;
+      border: 1px solid #333;
+      border-radius: 8px;
+      padding: 15px;
+      margin-bottom: 15px;
+    }
+    .panel h3 {
+      color: #00aaff;
+      font-size: 14px;
+      margin-bottom: 10px;
+    }
+    label {
+      display: block;
+      margin: 8px 0 4px;
+      font-size: 12px;
+      color: #888;
+    }
+    input, select {
+      width: 100%;
+      padding: 8px;
+      background: #0f0f23;
+      border: 1px solid #333;
+      color: #fff;
+      border-radius: 4px;
+    }
+    input[type="range"] {
+      padding: 0;
+    }
+    button {
+      width: 100%;
+      padding: 10px;
+      margin-top: 10px;
+      background: linear-gradient(180deg, #00aaff, #0066aa);
+      border: none;
+      color: #fff;
+      font-weight: bold;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    button:hover { opacity: 0.9; }
+    button.danger { background: linear-gradient(180deg, #ff4444, #aa2222); }
+    button.success { background: linear-gradient(180deg, #00ff88, #00aa55); }
+    
+    /* Canvas Area */
+    .canvas-container {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+    }
+    canvas {
+      background: #0a0a15;
+    }
+    
+    /* Info overlay */
+    .info {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: rgba(0,0,0,0.7);
+      padding: 10px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-family: monospace;
+    }
+    .info div { margin: 2px 0; }
+    
+    /* Minimap */
+    .minimap {
+      position: absolute;
+      bottom: 10px;
+      right: 10px;
+      border: 2px solid #00aaff;
+      background: rgba(0,0,0,0.5);
+    }
+    
+    /* Legend */
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 10px;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 11px;
+    }
+    .legend-color {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+    }
+  </style>
+</head>
+<body>
+  <div class="sidebar">
+    <h1>🗺️ BONZOOKAA Map Editor</h1>
+    
+    <div class="panel">
+      <h3>Generation Settings</h3>
+      <label>Seed</label>
+      <input type="text" id="seed" value="test123">
+      
+      <label>Act</label>
+      <select id="actSelect">
+        <option value="act1">Act 1: Asteroid Belt</option>
+        <option value="act2">Act 2: Nebula Depths</option>
+        <option value="act3">Act 3: The Void</option>
+      </select>
+      
+      <label>Zone Index</label>
+      <input type="number" id="zoneIndex" value="0" min="0" max="5">
+      
+      <button onclick="generateMap()" class="success">🎲 Generate Map</button>
+    </div>
+    
+    <div class="panel">
+      <h3>Density Overrides</h3>
+      <label>Enemy Density: <span id="enemyDensityVal">0.0004</span></label>
+      <input type="range" id="enemyDensity" min="0" max="0.001" step="0.00005" value="0.0004" oninput="updateDensityLabel(this)">
+      
+      <label>Elite Density: <span id="eliteDensityVal">0.00008</span></label>
+      <input type="range" id="eliteDensity" min="0" max="0.0003" step="0.00001" value="0.00008" oninput="updateDensityLabel(this)">
+      
+      <label>Obstacle Density: <span id="obstacleDensityVal">0.00025</span></label>
+      <input type="range" id="obstacleDensity" min="0" max="0.001" step="0.00005" value="0.00025" oninput="updateDensityLabel(this)">
+    </div>
+    
+    <div class="panel">
+      <h3>View Controls</h3>
+      <button onclick="centerOnSpawn()">📍 Center on Spawn</button>
+      <button onclick="centerOnExit()">🚪 Center on Exit</button>
+      <button onclick="fitToScreen()">📐 Fit to Screen</button>
+    </div>
+    
+    <div class="panel">
+      <h3>Export</h3>
+      <button onclick="exportJSON()">📄 Export Zone JSON</button>
+      <button onclick="exportPNG()">🖼️ Export as PNG</button>
+    </div>
+    
+    <div class="panel">
+      <h3>Legend</h3>
+      <div class="legend">
+        <div class="legend-item"><div class="legend-color" style="background:#00ff88"></div>Spawn</div>
+        <div class="legend-item"><div class="legend-color" style="background:#ff8800"></div>Exit</div>
+        <div class="legend-item"><div class="legend-color" style="background:#44aa44"></div>Enemy</div>
+        <div class="legend-item"><div class="legend-color" style="background:#ffaa00"></div>Elite</div>
+        <div class="legend-item"><div class="legend-color" style="background:#ff3355"></div>Boss</div>
+        <div class="legend-item"><div class="legend-color" style="background:#555566"></div>Obstacle</div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="canvas-container">
+    <canvas id="mapCanvas"></canvas>
+    <div class="info" id="info">
+      <div>Zone: <span id="infoSize">-</span></div>
+      <div>Enemies: <span id="infoEnemies">-</span></div>
+      <div>Elites: <span id="infoElites">-</span></div>
+      <div>Obstacles: <span id="infoObstacles">-</span></div>
+      <div>Mouse: <span id="infoMouse">-</span></div>
+    </div>
+    <canvas id="minimap" class="minimap" width="150" height="150"></canvas>
+  </div>
+
+<script type="module">
+// Import from main game (adjust path as needed)
+// For standalone use, we'll inline the generators
+
+// ===== SEEDED RANDOM =====
+class SeededRandom {
+  constructor(seed) {
+    this.seed = typeof seed === 'string' ? this.hashString(seed) : seed;
+    this.state = this.seed;
+  }
+  
+  hashString(str) {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      hash = ((hash << 5) - hash) + str.charCodeAt(i);
+      hash = hash & hash;
+    }
+    return Math.abs(hash) || 1;
+  }
+  
+  next() {
+    let t = this.state += 0x6D2B79F5;
+    t = Math.imul(t ^ t >>> 15, t | 1);
+    t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  }
+  
+  range(min, max) { return min + this.next() * (max - min); }
+  int(min, max) { return Math.floor(this.range(min, max + 1)); }
+  chance(p = 0.5) { return this.next() < p; }
+  pick(arr) { return arr[this.int(0, arr.length - 1)]; }
+}
+
+// ===== ACTS CONFIG =====
+const ACTS = {
+  act1: {
+    name: "Asteroid Belt",
+    biome: "asteroid",
+    zones: 4,
+    generation: { width: [1800, 2500], height: [1800, 2500], enemyDensity: 0.0004, eliteDensity: 0.00008, obstacleDensity: 0.00025 },
+    enemies: { pool: ["grunt", "scout"], elitePool: ["commander"] },
+    boss: { type: "sentinel" },
+    parallax: { bgColor: "#080810", nebula: { enabled: true, count: 5, color: "#221144" }}
+  },
+  act2: {
+    name: "Nebula Depths",
+    biome: "nebula",
+    zones: 5,
+    generation: { width: [2000, 3000], height: [2000, 3000], enemyDensity: 0.0005, eliteDensity: 0.0001, obstacleDensity: 0.0002 },
+    enemies: { pool: ["grunt", "scout", "diver"], elitePool: ["commander", "sniper"] },
+    boss: { type: "collector" },
+    parallax: { bgColor: "#100818", nebula: { enabled: true, count: 8, color: "#442266" }}
+  },
+  act3: {
+    name: "The Void",
+    biome: "void",
+    zones: 6,
+    generation: { width: [2500, 3500], height: [2500, 3500], enemyDensity: 0.0006, eliteDensity: 0.00012, obstacleDensity: 0.00015 },
+    enemies: { pool: ["scout", "diver", "tank"], elitePool: ["commander", "sniper", "berserker"] },
+    boss: { type: "harbinger" },
+    parallax: { bgColor: "#050508", nebula: { enabled: true, count: 3, color: "#220033" }}
+  }
+};
+
+// ===== MAP GENERATOR (simplified) =====
+function generateZone(actConfig, seed, overrides = {}) {
+  const rng = new SeededRandom(seed);
+  const cfg = { ...actConfig.generation, ...overrides };
+  
+  const width = Array.isArray(cfg.width) ? rng.int(cfg.width[0], cfg.width[1]) : cfg.width;
+  const height = Array.isArray(cfg.height) ? rng.int(cfg.height[0], cfg.height[1]) : cfg.height;
+  
+  // Spawn point
+  const spawn = { x: width / 2, y: height - 100 };
+  
+  // Exit point
+  const exit = { x: rng.range(200, width - 200), y: 100 };
+  
+  // Enemy spawns
+  const enemySpawns = [];
+  const enemyCount = Math.floor(width * height * cfg.enemyDensity);
+  for (let i = 0; i < enemyCount; i++) {
+    const x = rng.range(100, width - 100);
+    const y = rng.range(100, height - 100);
+    if (Math.hypot(x - spawn.x, y - spawn.y) > 300) {
+      enemySpawns.push({
+        x, y,
+        type: rng.pick(actConfig.enemies.pool),
+        patrol: rng.pick(['static', 'circle', 'line', 'wander']),
+        patrolRadius: rng.int(50, 150)
+      });
+    }
+  }
+  
+  // Elite spawns
+  const eliteSpawns = [];
+  const eliteCount = Math.max(1, Math.floor(width * height * cfg.eliteDensity));
+  for (let i = 0; i < eliteCount; i++) {
+    eliteSpawns.push({
+      x: rng.range(200, width - 200),
+      y: rng.range(200, height - 200),
+      type: rng.pick(actConfig.enemies.elitePool)
+    });
+  }
+  
+  // Obstacles
+  const obstacles = [];
+  const obstacleCount = Math.floor(width * height * cfg.obstacleDensity);
+  for (let i = 0; i < obstacleCount; i++) {
+    const type = rng.pick(['asteroid', 'debris', 'mine']);
+    obstacles.push({
+      x: rng.range(100, width - 100),
+      y: rng.range(100, height - 100),
+      type: type,
+      radius: type === 'asteroid' ? rng.int(30, 80) : rng.int(15, 30)
+    });
+  }
+  
+  // Stars for background
+  const stars = [];
+  const starCount = Math.floor(width * height * 0.0003);
+  for (let i = 0; i < starCount; i++) {
+    stars.push({
+      x: rng.range(0, width),
+      y: rng.range(0, height),
+      size: rng.range(0.5, 2),
+      brightness: rng.range(0.3, 1)
+    });
+  }
+  
+  return {
+    seed,
+    width,
+    height,
+    spawn,
+    exit,
+    enemySpawns,
+    eliteSpawns,
+    obstacles,
+    stars,
+    biome: actConfig.biome,
+    bgColor: actConfig.parallax.bgColor
+  };
+}
+
+// ===== EDITOR STATE =====
+let currentZone = null;
+let camera = { x: 0, y: 0 };
+let zoom = 0.3;
+let isDragging = false;
+let lastMouse = { x: 0, y: 0 };
+
+const canvas = document.getElementById('mapCanvas');
+const ctx = canvas.getContext('2d');
+const minimapCanvas = document.getElementById('minimap');
+const minimapCtx = minimapCanvas.getContext('2d');
+
+// ===== CANVAS SETUP =====
+function resizeCanvas() {
+  const container = canvas.parentElement;
+  canvas.width = container.clientWidth;
+  canvas.height = container.clientHeight;
+  render();
+}
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+
+// ===== RENDER =====
+function render() {
+  if (!currentZone) {
+    ctx.fillStyle = '#1a1a2e';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#666';
+    ctx.font = '20px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Click "Generate Map" to start', canvas.width/2, canvas.height/2);
+    return;
+  }
+  
+  ctx.save();
+  
+  // Background
+  ctx.fillStyle = currentZone.bgColor;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  
+  // Apply camera transform
+  ctx.translate(canvas.width/2, canvas.height/2);
+  ctx.scale(zoom, zoom);
+  ctx.translate(-camera.x, -camera.y);
+  
+  // Draw map bounds
+  ctx.strokeStyle = '#333';
+  ctx.lineWidth = 2 / zoom;
+  ctx.strokeRect(0, 0, currentZone.width, currentZone.height);
+  
+  // Stars
+  ctx.fillStyle = '#fff';
+  for (const star of currentZone.stars) {
+    ctx.globalAlpha = star.brightness;
+    ctx.beginPath();
+    ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  
+  // Obstacles
+  for (const obs of currentZone.obstacles) {
+    ctx.fillStyle = obs.type === 'asteroid' ? '#555566' : (obs.type === 'mine' ? '#ff4444' : '#444455');
+    ctx.beginPath();
+    ctx.arc(obs.x, obs.y, obs.radius, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  
+  // Enemy spawns
+  for (const e of currentZone.enemySpawns) {
+    ctx.fillStyle = '#44aa44';
+    ctx.beginPath();
+    ctx.arc(e.x, e.y, 15, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Patrol radius
+    if (e.patrol !== 'static') {
+      ctx.strokeStyle = 'rgba(68, 170, 68, 0.3)';
+      ctx.lineWidth = 1 / zoom;
+      ctx.beginPath();
+      ctx.arc(e.x, e.y, e.patrolRadius, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+  }
+  
+  // Elite spawns
+  for (const e of currentZone.eliteSpawns) {
+    ctx.fillStyle = '#ffaa00';
+    ctx.beginPath();
+    ctx.arc(e.x, e.y, 22, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2 / zoom;
+    ctx.stroke();
+  }
+  
+  // Spawn point
+  ctx.fillStyle = '#00ff88';
+  ctx.shadowColor = '#00ff88';
+  ctx.shadowBlur = 20;
+  ctx.beginPath();
+  ctx.arc(currentZone.spawn.x, currentZone.spawn.y, 30, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = '#000';
+  ctx.font = `bold ${20/zoom}px sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.fillText('S', currentZone.spawn.x, currentZone.spawn.y + 7);
+  
+  // Exit point
+  ctx.fillStyle = '#ff8800';
+  ctx.shadowColor = '#ff8800';
+  ctx.shadowBlur = 20;
+  ctx.beginPath();
+  ctx.arc(currentZone.exit.x, currentZone.exit.y, 30, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = '#000';
+  ctx.fillText('E', currentZone.exit.x, currentZone.exit.y + 7);
+  
+  ctx.restore();
+  
+  // Update info
+  document.getElementById('infoSize').textContent = `${currentZone.width} x ${currentZone.height}`;
+  document.getElementById('infoEnemies').textContent = currentZone.enemySpawns.length;
+  document.getElementById('infoElites').textContent = currentZone.eliteSpawns.length;
+  document.getElementById('infoObstacles').textContent = currentZone.obstacles.length;
+  
+  // Render minimap
+  renderMinimap();
+}
+
+function renderMinimap() {
+  if (!currentZone) return;
+  
+  const scale = 150 / Math.max(currentZone.width, currentZone.height);
+  
+  minimapCtx.fillStyle = currentZone.bgColor;
+  minimapCtx.fillRect(0, 0, 150, 150);
+  
+  // Map area
+  minimapCtx.strokeStyle = '#333';
+  minimapCtx.strokeRect(0, 0, currentZone.width * scale, currentZone.height * scale);
+  
+  // Enemies
+  minimapCtx.fillStyle = '#44aa44';
+  for (const e of currentZone.enemySpawns) {
+    minimapCtx.fillRect(e.x * scale - 1, e.y * scale - 1, 2, 2);
+  }
+  
+  // Elites
+  minimapCtx.fillStyle = '#ffaa00';
+  for (const e of currentZone.eliteSpawns) {
+    minimapCtx.fillRect(e.x * scale - 2, e.y * scale - 2, 4, 4);
+  }
+  
+  // Spawn/Exit
+  minimapCtx.fillStyle = '#00ff88';
+  minimapCtx.fillRect(currentZone.spawn.x * scale - 3, currentZone.spawn.y * scale - 3, 6, 6);
+  minimapCtx.fillStyle = '#ff8800';
+  minimapCtx.fillRect(currentZone.exit.x * scale - 3, currentZone.exit.y * scale - 3, 6, 6);
+  
+  // Viewport
+  const viewW = canvas.width / zoom;
+  const viewH = canvas.height / zoom;
+  const viewX = camera.x - viewW/2;
+  const viewY = camera.y - viewH/2;
+  
+  minimapCtx.strokeStyle = '#00aaff';
+  minimapCtx.lineWidth = 1;
+  minimapCtx.strokeRect(viewX * scale, viewY * scale, viewW * scale, viewH * scale);
+}
+
+// ===== CONTROLS =====
+canvas.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  const delta = e.deltaY > 0 ? 0.9 : 1.1;
+  zoom = Math.max(0.1, Math.min(2, zoom * delta));
+  render();
+});
+
+canvas.addEventListener('mousedown', (e) => {
+  isDragging = true;
+  lastMouse = { x: e.clientX, y: e.clientY };
+});
+
+canvas.addEventListener('mousemove', (e) => {
+  if (isDragging) {
+    const dx = (e.clientX - lastMouse.x) / zoom;
+    const dy = (e.clientY - lastMouse.y) / zoom;
+    camera.x -= dx;
+    camera.y -= dy;
+    lastMouse = { x: e.clientX, y: e.clientY };
+    render();
+  }
+  
+  // Update mouse position
+  if (currentZone) {
+    const rect = canvas.getBoundingClientRect();
+    const mx = (e.clientX - rect.left - canvas.width/2) / zoom + camera.x;
+    const my = (e.clientY - rect.top - canvas.height/2) / zoom + camera.y;
+    document.getElementById('infoMouse').textContent = `${Math.round(mx)}, ${Math.round(my)}`;
+  }
+});
+
+canvas.addEventListener('mouseup', () => isDragging = false);
+canvas.addEventListener('mouseleave', () => isDragging = false);
+
+// ===== GLOBAL FUNCTIONS =====
+window.generateMap = function() {
+  const seed = document.getElementById('seed').value || 'default';
+  const actId = document.getElementById('actSelect').value;
+  const zoneIndex = parseInt(document.getElementById('zoneIndex').value);
+  
+  const actConfig = ACTS[actId];
+  const zoneSeed = seed + '_zone' + zoneIndex;
+  
+  const overrides = {
+    enemyDensity: parseFloat(document.getElementById('enemyDensity').value),
+    eliteDensity: parseFloat(document.getElementById('eliteDensity').value),
+    obstacleDensity: parseFloat(document.getElementById('obstacleDensity').value)
+  };
+  
+  currentZone = generateZone(actConfig, zoneSeed, overrides);
+  
+  // Center on spawn
+  camera.x = currentZone.spawn.x;
+  camera.y = currentZone.spawn.y;
+  zoom = 0.4;
+  
+  render();
+};
+
+window.updateDensityLabel = function(input) {
+  document.getElementById(input.id + 'Val').textContent = input.value;
+};
+
+window.centerOnSpawn = function() {
+  if (currentZone) {
+    camera.x = currentZone.spawn.x;
+    camera.y = currentZone.spawn.y;
+    render();
+  }
+};
+
+window.centerOnExit = function() {
+  if (currentZone) {
+    camera.x = currentZone.exit.x;
+    camera.y = currentZone.exit.y;
+    render();
+  }
+};
+
+window.fitToScreen = function() {
+  if (currentZone) {
+    camera.x = currentZone.width / 2;
+    camera.y = currentZone.height / 2;
+    zoom = Math.min(canvas.width / currentZone.width, canvas.height / currentZone.height) * 0.9;
+    render();
+  }
+};
+
+window.exportJSON = function() {
+  if (!currentZone) return;
+  const json = JSON.stringify(currentZone, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `zone_${currentZone.seed}.json`;
+  a.click();
+};
+
+window.exportPNG = function() {
+  if (!currentZone) return;
+  const a = document.createElement('a');
+  a.href = canvas.toDataURL('image/png');
+  a.download = `map_${currentZone.seed}.png`;
+  a.click();
+};
+
+// Initial render
+render();
+</script>
+</body>
+</html>
