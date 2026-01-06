@@ -70,16 +70,16 @@
     }
   },
   "exploration": {
-    "enemyDensityMult": 0.25,
-    "eliteDensityMult": 0.4,
-    "maxEnemySpawnsPerZone": 90,
-    "maxEliteSpawnsPerZone": 6,
+    "enemyDensityMult": 0.45,
+    "eliteDensityMult": 0.5,
+    "maxEnemySpawnsPerZone": 190,
+    "maxEliteSpawnsPerZone": 20,
     "enemySpawnMinDistBetween": 190,
     "enemySpawnMinDistFromSpawn": 360,
     "enemySpawnMinDistFromExit": 240,
     "spawnViewMargin": 520,
     "despawnViewMargin": 1800,
-    "enemyAggroRangeMult": 0.3,
-    "enemyFireIntervalMult": 2.3
+    "enemyAggroRangeMult": 0.5,
+    "enemyFireIntervalMult": 1,7
   }
 }
