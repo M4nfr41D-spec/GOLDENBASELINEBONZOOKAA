@@ -71,6 +71,9 @@ const Game = {
       Enemies, Bullets, Pickups, Particles, UI,
       Camera, World, SceneManager
     };
+
+    // Allow world/systems to invoke high-level game flow (e.g., portal -> hub)
+    State.modules.Game = this;
     
     // Initialize systems
     Input.init(this.canvas);
@@ -159,6 +162,11 @@ const Game = {
       
       if (scene === 'combat' && !State.ui.paused) {
         this.updateCombat(dt);
+      }
+
+      // Clear edge-triggered inputs (one-shot actions)
+      if (State.input) {
+        State.input.interactPressed = false;
       }
       // Post-update invariants: caps + core sanity + sampled entity checks
       Invariants.postFrame({ phase: 'postUpdate', act: State.world?.currentAct, zoneIndex: State.world?.zoneIndex });

@@ -66,3 +66,35 @@ Default Caps (anpassbar in `Invariants.caps`):
 ## Validierung
 - 60–120s intensives Combat (viel FireRate/Projectiles) → keine Freezes, keine runaway entity counts.
 - Bei absichtlich provoziertem NaN (Debug) → klarer Error + Dump in Console + `localStorage.bonz_last_dump`.
+
+---
+
+# Cleanroom Patch 4 – View-Prewarm Spawning + Tuning (Dichte/Aggro/Fire)
+
+## Ziel
+- **Gegner-Pop-in eliminieren**: Spawns werden bereits aktiviert, bevor der Spawn-Punkt in den Viewport wandert.
+- **Gegnerdichte reduzieren** (ohne Act-Daten zu verändern): harte Caps pro Zone + optionale Density-Multipliers.
+- **Testbarkeit verbessern**: reduzierte Aggro-Range + langsamere Feuerintervalle.
+
+## Neu in `data/config.json`
+- `exploration.enemyDensityMult`
+- `exploration.eliteDensityMult`
+- `exploration.maxEnemySpawnsPerZone`
+- `exploration.maxEliteSpawnsPerZone`
+- `exploration.enemySpawnMinDist*`
+- `exploration.spawnViewMargin`
+- `exploration.despawnViewMargin`
+- `exploration.enemyAggroRangeMult`
+- `exploration.enemyFireIntervalMult`
+
+## Geänderte Dateien
+- main.js
+- runtime/world/World.js
+- runtime/world/MapGenerator.js
+- runtime/Enemies.js
+- data/config.json
+
+## Validierung
+- Beim schnellen Movement auf neue Spawns: Gegner sollen **nicht mehr direkt neben dem Schiff auftauchen**, sondern spätestens am Screen-Rand sichtbar werden.
+- Zonen-Load: Spawn-Anzahl bleibt bounded (keine "Hundertschaften" mehr) – lesbares Combat.
+- Aggro/Feuerrate spürbar ruhiger für Debugging/QA.

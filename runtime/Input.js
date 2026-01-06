@@ -65,6 +65,15 @@ export const Input = {
       case 'Space':
         input.fire = true;
         break;
+      case 'KeyE':
+        // Edge-trigger (pressed) + level-trigger (held)
+        if (!input.interact) input.interactPressed = true;
+        input.interact = true;
+        break;
+      case 'ShiftLeft':
+      case 'ShiftRight':
+        input.shift = true;
+        break;
     }
   },
   
@@ -90,6 +99,13 @@ export const Input = {
         break;
       case 'Space':
         input.fire = false;
+        break;
+      case 'KeyE':
+        input.interact = false;
+        break;
+      case 'ShiftLeft':
+      case 'ShiftRight':
+        input.shift = false;
         break;
     }
   },

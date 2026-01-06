@@ -130,6 +130,10 @@ export const State = {
     left: false,
     right: false,
     fire: false,
+    // Interaction (portals, terminals, etc.)
+    interact: false,
+    interactPressed: false,
+    shift: false,
     mouseX: 0,
     mouseY: 0
   },

@@ -62,6 +62,13 @@ export const World = {
   
   // Load/generate a zone (endless via depth)
   loadZone(index) {
+    // Zone transition cleanup: prevent entity/bullet carry-over
+    State.bullets = [];
+    State.enemyBullets = [];
+    State.enemies = [];
+    State.pickups = [];
+    State.particles = [];
+
     // Depth is 1-based
     const depth = index + 1;
     const zoneSeed = MapGenerator.createZoneSeed(this.currentAct.seed, index);
@@ -70,10 +77,15 @@ export const World = {
     DepthRules.maybeUnlock(depth, this.currentAct);
     DepthRules.recordDepth(depth);
 
-    // Boss interval: default to act.zones (number) or 4
-    const bossInterval = (typeof this.currentAct.zones === 'number' && this.currentAct.zones > 0)
+    // Boss interval: prefer config (exploration.bossEveryNZones), else act.zones, else 10
+    const tune = State.data.config?.exploration || {};
+    const cfgBossEvery = (typeof tune.bossEveryNZones === 'number' && tune.bossEveryNZones > 0)
+      ? tune.bossEveryNZones
+      : null;
+    const actBossEvery = (typeof this.currentAct.zones === 'number' && this.currentAct.zones > 0)
       ? this.currentAct.zones
-      : 4;
+      : null;
+    const bossInterval = cfgBossEvery || actBossEvery || 10;
     const isBossZone = (depth % bossInterval) === 0;
 
     // Sample active modifiers for this zone
@@ -122,6 +134,7 @@ export const World = {
     const tune = State.data.config?.exploration || {};
     const spawnMargin = (typeof tune.spawnViewMargin === 'number') ? tune.spawnViewMargin : this.spawnViewMargin;
     const despawnMargin = (typeof tune.despawnViewMargin === 'number') ? tune.despawnViewMargin : this.despawnViewMargin;
+    const portalRadius = (typeof tune.portalInteractRadius === 'number') ? tune.portalInteractRadius : 75;
 
     // Use camera target (less laggy) for spawn checks.
     const camX = (Camera.targetX != null) ? Camera.targetX : Camera.getX();
@@ -218,12 +231,18 @@ export const World = {
       }
     }
     
-    // Check portal collision
+    // Portal interaction (no auto-teleport): require player input
+    this.nearPortal = null;
     for (const portal of this.currentZone.portals) {
       const dist = Math.hypot(player.x - portal.x, player.y - portal.y);
-      if (dist < 60) {
-        this.onPortalEnter(portal);
+      if (dist < portalRadius) {
+        this.nearPortal = portal;
+        break;
       }
+    }
+
+    if (this.nearPortal && State.input?.interactPressed) {
+      this.usePortal(this.nearPortal);
     }
     
     // Enemy AI (patrol/aggro/return) is handled in Enemies.update() for exploration mode.
@@ -359,13 +378,15 @@ export const World = {
   
   // Boss killed - spawn portal
   onBossKilled() {
-    State.ui?.showAnnouncement?.('✨ PORTAL OPENED!');
-    
-    // Spawn portal to hub
+    // Track run stats (best-effort)
+    if (State.run?.stats) State.run.stats.bossesKilled = (State.run.stats.bossesKilled || 0) + 1;
+
+    // Spawn portal to next zone (Shift+E can return to hub)
     this.currentZone.portals.push({
       x: this.currentZone.width / 2,
       y: this.currentZone.height / 2,
-      destination: 'hub',
+      destination: 'next',
+      allowHub: true,
       type: 'victory'
     });
   },
@@ -376,16 +397,40 @@ export const World = {
     this.loadZone(nextZone);
   },
   
-  // Player entered portal
-  onPortalEnter(portal) {
+  // Use portal (requires interact input)
+  usePortal(portal) {
+    const wantsHub = !!State.input?.shift;
+    const Game = State.modules?.Game;
+    const SceneManager = State.modules?.SceneManager;
+
+    if (wantsHub && portal.allowHub) {
+      // Prefer full game-flow (credits resources, saves, shows hub)
+      if (Game?.returnToHub) Game.returnToHub();
+      else if (SceneManager?.returnToHub) SceneManager.returnToHub('portal');
+      return;
+    }
+
+    if (portal.destination === 'next') {
+      const nextZone = this.zoneIndex + 1;
+      this.loadZone(nextZone);
+      return;
+    }
+
     if (portal.destination === 'hub') {
-      // Transition to hub
-      State.scene = 'hub';
-      State.ui?.renderHub?.();
-    } else if (portal.destination) {
-      // Load specific act/zone
+      if (Game?.returnToHub) Game.returnToHub();
+      else if (SceneManager?.returnToHub) SceneManager.returnToHub('portal');
+      return;
+    }
+
+    // Fallback: load act by id
+    if (portal.destination && typeof portal.destination === 'string') {
       this.init(portal.destination);
     }
+  },
+
+  // Backwards-compatible hook (if older code calls onPortalEnter)
+  onPortalEnter(portal) {
+    this.usePortal(portal);
   },
   
   // Update enemy patrol behavior
@@ -526,6 +571,17 @@ export const World = {
       ctx.font = 'bold 12px Orbitron';
       ctx.textAlign = 'center';
       ctx.fillText('PORTAL', portal.x, portal.y + 5);
+
+      // Interaction hint (shown only when player is in range)
+      if (this.nearPortal === portal) {
+        ctx.font = 'bold 11px Orbitron';
+        if (portal.destination === 'next') {
+          ctx.fillText('E: CONTINUE', portal.x, portal.y - 50);
+          if (portal.allowHub) ctx.fillText('SHIFT+E: HUB', portal.x, portal.y - 34);
+        } else {
+          ctx.fillText('E: USE', portal.x, portal.y - 50);
+        }
+      }
     }
   },
   
