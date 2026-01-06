@@ -58,6 +58,17 @@ export const MapGenerator = {
     let width = pickRange(cfg.width, 1500, 3000);
     let height = pickRange(cfg.height, 1500, 3000);
     if (crampedMult !== 1.0) { width = Math.floor(width * crampedMult); height = Math.floor(height * crampedMult); }
+
+    // Map scale (exploration tuning)
+    // NOTE: We intentionally scale the *world size* without scaling enemy counts linearly.
+    // Density and hard caps (maxEnemySpawnsPerZone) remain the primary knobs to keep zones testable.
+    const mapScale = (typeof tune.mapScale === 'number' && isFinite(tune.mapScale) && tune.mapScale > 0)
+      ? tune.mapScale
+      : 1.0;
+    if (mapScale !== 1.0) {
+      width = Math.max(600, Math.floor(width * mapScale));
+      height = Math.max(600, Math.floor(height * mapScale));
+    }
     
     // Generate zone structure
     const zone = {

@@ -98,3 +98,23 @@ Default Caps (anpassbar in `Invariants.caps`):
 - Beim schnellen Movement auf neue Spawns: Gegner sollen **nicht mehr direkt neben dem Schiff auftauchen**, sondern spätestens am Screen-Rand sichtbar werden.
 - Zonen-Load: Spawn-Anzahl bleibt bounded (keine "Hundertschaften" mehr) – lesbares Combat.
 - Aggro/Feuerrate spürbar ruhiger für Debugging/QA.
+
+---
+
+# Cleanroom Patch 7A – Map Scale (größere Zonen ohne Spawn-Explosion)
+
+## Ziel
+- Zonen sind **deutlich größer** (Exploration wird relevant; nicht mehr "in 2 Sekunden quer durch").
+- Enemy-Counts skalieren **nicht** flächenlinear mit – hard caps + Density-Multipliers bleiben die primären Stellschrauben.
+
+## Neu in `data/config.json`
+- `exploration.mapScale` (Default: 5.0)
+
+## Geänderte Dateien
+- runtime/world/MapGenerator.js
+- data/config.json
+
+## Validierung
+- Zone lädt normal, FPS stabil.
+- Keine Enemy-Floods (Caps greifen weiterhin).
+- Travel-Time spürbar höher; Pop-in bleibt durch View-Prewarm weiterhin eliminiert.
