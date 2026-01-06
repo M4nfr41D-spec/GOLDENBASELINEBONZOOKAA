@@ -48,7 +48,7 @@
     "eliteDropChance": 0.3
   },
   "stash": {
-    "baseSlots": 56,
+    "baseSlots": 120,
     "maxSlots": 200
   },
   "effects": {
@@ -71,11 +71,11 @@
   },
   "exploration": {
     "bossEveryNZones": 10,
-    "mapScale": 5.0,
-    "enemyDensityMult": 0.35,
+    "mapScale": 3.0,
+    "enemyDensityMult": 0.55,
     "eliteDensityMult": 0.5,
-    "maxEnemySpawnsPerZone": 90,
-    "maxEliteSpawnsPerZone": 6,
+    "maxEnemySpawnsPerZone": 150,
+    "maxEliteSpawnsPerZone": 15,
     "enemySpawnMinDistBetween": 190,
     "enemySpawnMinDistFromSpawn": 360,
     "enemySpawnMinDistFromExit": 240,
