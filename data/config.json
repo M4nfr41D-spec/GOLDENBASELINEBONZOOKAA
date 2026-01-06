@@ -4,7 +4,7 @@
   "player": {
     "baseHP": 100,
     "baseDamage": 6,
-    "baseSpeed": 320,
+    "baseSpeed": 220,
     "baseFireRate": 3.5,
     "baseCritChance": 5,
     "baseCritDamage": 150,
@@ -70,8 +70,8 @@
     }
   },
   "exploration": {
-    "enemyDensityMult": 0.35,
-    "eliteDensityMult": 0.5,
+    "enemyDensityMult": 0.25,
+    "eliteDensityMult": 0.4,
     "maxEnemySpawnsPerZone": 90,
     "maxEliteSpawnsPerZone": 6,
     "enemySpawnMinDistBetween": 190,
@@ -79,7 +79,7 @@
     "enemySpawnMinDistFromExit": 240,
     "spawnViewMargin": 520,
     "despawnViewMargin": 1800,
-    "enemyAggroRangeMult": 0.7,
-    "enemyFireIntervalMult": 1.75
+    "enemyAggroRangeMult": 0.3,
+    "enemyFireIntervalMult": 2.3
   }
 }
