@@ -407,8 +407,10 @@ export const MapGenerator = {
   generateStarfield(rng, w, h, density, maxCount = null) {
     const stars = [];
     const countRaw = Math.floor(w * h * density);
-    const count = Math.min(countRaw, maxObs);
-
+    const cap = (typeof maxCount === 'number' && Number.isFinite(maxCount) && maxCount > 0)
+      ? Math.floor(maxCount)
+      : null;
+    const count = cap ? Math.min(countRaw, cap) : countRaw;
     for (let i = 0; i < count; i++) {
       stars.push({
         x: rng.range(0, w),
