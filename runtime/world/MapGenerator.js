@@ -121,6 +121,16 @@ export const MapGenerator = {
       zone.spawn,
       zone.exit
     );
+
+    // Optional: apply pack director (v9A0). Packs consume the existing spawn budget.
+    // This keeps density/perf stable while adding composition variety.
+    zone.enemySpawns = this.applyPackDirector(
+      rng,
+      zone.enemySpawns,
+      actConfig.enemies?.pool || ['grunt'],
+      zone.spawn,
+      zone.exit
+    );
     
     // Generate elite spawns
     zone.eliteSpawns = this.generateEliteSpawns(
@@ -268,6 +278,123 @@ export const MapGenerator = {
     }
     
     return spawns;
+  },
+
+  // ------------------------------------------------------------
+  // Pack Director (v9A0)
+  // ------------------------------------------------------------
+  // Turns a portion of single spawns into small packs (3-5 members)
+  // using templates from data/packs.json when available.
+  // Invariants:
+  // - Does NOT increase total spawn count (consumes existing budget)
+  // - Deterministic for a given rng/seed
+  // - Keeps spawns away from spawn/exit
+  applyPackDirector(rng, spawns, pool, spawnPt, exitPt) {
+    const packsData = State.data.packs;
+    if (!packsData || !Array.isArray(packsData.templates) || packsData.templates.length === 0) {
+      return spawns;
+    }
+
+    // Settings (defaults chosen to be safe/testable)
+    const packChance = (typeof packsData.packChance === 'number') ? packsData.packChance : 0.7;
+    const minSize = (typeof packsData.packSizeMin === 'number') ? packsData.packSizeMin : 3;
+    const maxSize = (typeof packsData.packSizeMax === 'number') ? packsData.packSizeMax : 5;
+    const maxPacksPerZone = (typeof packsData.maxPacksPerZone === 'number') ? packsData.maxPacksPerZone : 6;
+    const spacing = (typeof packsData.memberSpacing === 'number') ? packsData.memberSpacing : 120;
+    const minDistFromSpawn = (typeof packsData.minDistFromSpawn === 'number') ? packsData.minDistFromSpawn : 350;
+    const minDistFromExit  = (typeof packsData.minDistFromExit === 'number') ? packsData.minDistFromExit : 250;
+
+    if (!Array.isArray(spawns) || spawns.length < minSize) return spawns;
+
+    // Shuffle indices deterministically
+    const idx = spawns.map((_, i) => i);
+    for (let i = idx.length - 1; i > 0; i--) {
+      const j = rng.int(0, i);
+      const tmp = idx[i];
+      idx[i] = idx[j];
+      idx[j] = tmp;
+    }
+
+    // Helpers
+    const pickTemplate = () => {
+      // weighted pick
+      let total = 0;
+      for (const t of packsData.templates) total += (typeof t.weight === 'number' ? t.weight : 1);
+      let r = rng.range(0, total);
+      for (const t of packsData.templates) {
+        r -= (typeof t.weight === 'number' ? t.weight : 1);
+        if (r <= 0) return t;
+      }
+      return packsData.templates[0];
+    };
+
+    const validAnchor = (p) => {
+      const ds = Math.hypot(p.x - spawnPt.x, p.y - spawnPt.y);
+      const de = Math.hypot(p.x - exitPt.x,  p.y - exitPt.y);
+      return ds >= minDistFromSpawn && de >= minDistFromExit;
+    };
+
+    const used = new Set();
+    const out = [];
+    let packsMade = 0;
+
+    for (let k = 0; k < idx.length && packsMade < maxPacksPerZone; k++) {
+      const i = idx[k];
+      if (used.has(i)) continue;
+      const anchor = spawns[i];
+      if (!anchor || !validAnchor(anchor)) continue;
+
+      if (rng.range(0, 1) > packChance) continue;
+
+      const tpl = pickTemplate();
+      const size = rng.int(minSize, maxSize);
+
+      // consume 'size' spawns from budget (anchor + size-1 additional)
+      used.add(i);
+      let consumed = 1;
+      for (let kk = k + 1; kk < idx.length && consumed < size; kk++) {
+        const j = idx[kk];
+        if (used.has(j)) continue;
+        used.add(j);
+        consumed++;
+      }
+
+      // Create pack members around anchor
+      for (let m = 0; m < size; m++) {
+        const angle = rng.range(0, Math.PI * 2);
+        const dist = rng.range(30, spacing);
+        const px = anchor.x + Math.cos(angle) * dist;
+        const py = anchor.y + Math.sin(angle) * dist;
+
+        // Template can force types; otherwise use pool
+        let type = null;
+        if (tpl && Array.isArray(tpl.types) && tpl.types.length > 0) {
+          type = rng.pick(tpl.types);
+        }
+        if (!type) type = rng.pick(pool);
+
+        out.push({
+          x: px,
+          y: py,
+          type,
+          patrol: anchor.patrol,
+          patrolRadius: anchor.patrolRadius,
+          active: false,
+          killed: false,
+          packId: tpl?.id || 'pack'
+        });
+      }
+
+      packsMade++;
+    }
+
+    // Add remaining singles (not consumed)
+    for (let i = 0; i < spawns.length; i++) {
+      if (used.has(i)) continue;
+      out.push(spawns[i]);
+    }
+
+    return out;
   },
   
   // Elite spawn positions

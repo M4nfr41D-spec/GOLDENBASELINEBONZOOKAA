@@ -48,7 +48,7 @@
     "eliteDropChance": 0.3
   },
   "stash": {
-    "baseSlots": 150,
+    "baseSlots": 56,
     "maxSlots": 200
   },
   "effects": {
@@ -72,10 +72,10 @@
   "exploration": {
     "bossEveryNZones": 10,
     "mapScale": 5.0,
-    "enemyDensityMult": 0.85,
+    "enemyDensityMult": 0.35,
     "eliteDensityMult": 0.5,
-    "maxEnemySpawnsPerZone": 600,
-    "maxEliteSpawnsPerZone": 60,
+    "maxEnemySpawnsPerZone": 90,
+    "maxEliteSpawnsPerZone": 6,
     "enemySpawnMinDistBetween": 190,
     "enemySpawnMinDistFromSpawn": 360,
     "enemySpawnMinDistFromExit": 240,
@@ -91,7 +91,7 @@
   },
   "asteroids": {
     "enabled": true,
-    "maxPerZone": 300,
+    "maxPerZone": 30,
     "playerCollisionDamagePct": 0.05,
     "playerCollisionCooldown": 0.75,
     "knockbackStrength": 280,

@@ -18,7 +18,9 @@ const DATA_FILES = [
   'pilotStats',
   'runUpgrades',
   'enemies',
-  'acts'
+  'acts',
+  // v9A0+: optional procedural director data
+  'packs'
 ];
 
 export async function loadAllData() {

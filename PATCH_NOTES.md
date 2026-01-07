@@ -118,3 +118,24 @@ Default Caps (anpassbar in `Invariants.caps`):
 - Zone lädt normal, FPS stabil.
 - Keine Enemy-Floods (Caps greifen weiterhin).
 - Travel-Time spürbar höher; Pop-in bleibt durch View-Prewarm weiterhin eliminiert.
+
+---
+
+# Patch 9A0 – Pack Director Minimal (3–5er Packs, keine neuen Enemy-Typen)
+
+## Ziel
+- **Pack-Spawns** aktivieren, ohne neue Gegnerklassen oder Status-Systeme.
+- Packs **verbrauchen** das bestehende Spawn-Budget (keine zusätzliche Gegnerdichte).
+- Deterministisch: gleicher Seed ⇒ gleiche Pack-Struktur.
+
+## Neu
+- `data/packs.json` (Pack-Templates + Director Defaults)
+
+## Geänderte Dateien
+- `runtime/DataLoader.js` (lädt nun zusätzlich `packs.json`)
+- `runtime/world/MapGenerator.js` (applyPackDirector Hook)
+
+## Validierung
+- Zone startet ohne Errors.
+- Sichtbar: Gruppen erscheinen als Cluster (3–5 Gegner nahe beieinander) neben Singles.
+- Gesamtzahl der Gegner bleibt innerhalb der bestehenden Caps.

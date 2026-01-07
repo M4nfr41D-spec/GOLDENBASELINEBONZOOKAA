@@ -1,0 +1,14 @@
+{
+  "version": "9A0",
+  "packChance": 0.70,
+  "packSizeMin": 3,
+  "packSizeMax": 5,
+  "maxPacksPerZone": 6,
+  "memberSpacing": 140,
+  "minDistFromSpawn": 350,
+  "minDistFromExit": 250,
+  "templates": [
+    { "id": "pack_swarm", "weight": 3, "types": [] },
+    { "id": "pack_mixed", "weight": 2, "types": [] }
+  ]
+}
