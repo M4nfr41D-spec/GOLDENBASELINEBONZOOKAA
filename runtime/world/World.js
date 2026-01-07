@@ -7,6 +7,8 @@
 // Manages current zone, spawns enemies when player approaches
 
 import { State } from '../State.js';
+import { Player } from '../Player.js';
+import { Particles } from '../Particles.js';
 import { MapGenerator } from './MapGenerator.js';
 import { Camera } from './Camera.js';
 import { SeededRandom } from './SeededRandom.js';
@@ -16,6 +18,10 @@ export const World = {
   currentZone: null,
   currentAct: null,
   zoneIndex: 0,
+
+  // Cached asteroid sprites (optional)
+  _asteroidSpritesLoaded: false,
+  _asteroidSprites: [],
   
   // Spawning config
   // Legacy distance-based spawning (kept as fallback)
@@ -36,7 +42,124 @@ export const World = {
       y <= camY + screenH + margin
     );
   },
-  
+
+  // Lazy-load optional asteroid sprites (safe fallback to vector draw)
+  _ensureAsteroidSpritesLoaded() {
+    if (this._asteroidSpritesLoaded) return;
+    this._asteroidSpritesLoaded = true;
+
+    const cfg = State.data.config?.asteroids || {};
+    const paths = Array.isArray(cfg.spritePaths) && cfg.spritePaths.length
+      ? cfg.spritePaths
+      : [
+          './assets/asteroids/asteroid_1.png',
+          './assets/asteroids/asteroid_2.png'
+        ];
+
+    this._asteroidSprites = paths.map((src) => {
+      const img = new Image();
+      img.src = src;
+      return img;
+    });
+  },
+
+  // Reduce generated asteroid obstacles down to a bounded, gameplay-relevant set.
+  // Keeps performance stable regardless of zone size/density.
+  // Also guarantees a small cluster near spawn so you SEE them immediately.
+  _prepareAsteroidsForZone(zoneSeed) {
+    if (!this.currentZone) return;
+
+    const cfg = State.data.config?.asteroids || {};
+    const enabled = cfg.enabled !== false;
+    if (!enabled) {
+      this.currentZone.asteroids = [];
+      return;
+    }
+
+    const maxPerZone = (typeof cfg.maxPerZone === 'number') ? cfg.maxPerZone : 30;
+    const minNearSpawn = (typeof cfg.minNearSpawn === 'number') ? cfg.minNearSpawn : Math.min(6, maxPerZone);
+    const nearSpawnRadius = (typeof cfg.nearSpawnRadius === 'number') ? cfg.nearSpawnRadius : 1400;
+
+    const zone = this.currentZone;
+    const spawn = zone.spawn || { x: zone.width / 2, y: zone.height / 2 };
+
+    const candidates = [];
+    const remaining = [];
+
+    for (const obs of zone.obstacles || []) {
+      // Be tolerant: consider any 'asteroid' obstacle unless explicitly non-destructible.
+      if (obs?.type === 'asteroid' && obs.destructible !== false) candidates.push(obs);
+      else remaining.push(obs);
+    }
+
+    // Deterministic RNG for selection & clustering
+    const rng = new SeededRandom((zoneSeed ^ 0xA57E01D) >>> 0);
+    const shuffle = (arr) => {
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = rng.int(0, i);
+        const t = arr[i];
+        arr[i] = arr[j];
+        arr[j] = t;
+      }
+    };
+
+    const near = [];
+    const far = [];
+    for (const c of candidates) {
+      const d = Math.hypot((c.x || 0) - spawn.x, (c.y || 0) - spawn.y);
+      (d <= nearSpawnRadius ? near : far).push(c);
+    }
+
+    shuffle(near);
+    shuffle(far);
+
+    const picked = [];
+    const takeNear = Math.min(Math.max(0, minNearSpawn), maxPerZone, near.length);
+    if (takeNear > 0) picked.push(...near.slice(0, takeNear));
+
+    const restPool = near.slice(takeNear).concat(far);
+    shuffle(restPool);
+
+    const remainingSlots = Math.max(0, maxPerZone - picked.length);
+    if (remainingSlots > 0) picked.push(...restPool.slice(0, remainingSlots));
+
+    // If no candidates exist (e.g. obstacleDensity==0), synthesize a small deterministic cluster.
+    if (picked.length === 0 && maxPerZone > 0) {
+      const synthCount = Math.min(maxPerZone, Math.max(4, minNearSpawn || 0));
+      for (let i = 0; i < synthCount; i++) {
+        const ang = rng.range(0, Math.PI * 2);
+        const dist = rng.range(420, Math.max(520, nearSpawnRadius));
+        const x = Math.max(120, Math.min(zone.width - 120, spawn.x + Math.cos(ang) * dist));
+        const y = Math.max(120, Math.min(zone.height - 120, spawn.y + Math.sin(ang) * dist));
+        picked.push({
+          x, y,
+          type: 'asteroid',
+          radius: rng.int(34, 74),
+          rotation: rng.range(0, Math.PI * 2),
+          destructible: true,
+          hp: rng.int(25, 60),
+          damage: 0
+        });
+      }
+    }
+
+    // Remove ALL asteroid obstacles from the generic obstacle list (perf) and keep only our bounded props.
+    zone.obstacles = remaining;
+
+    // Sprite selection uses configured paths count (safe even if images fail to load).
+    const spriteCount = (Array.isArray(cfg.spritePaths) && cfg.spritePaths.length) ? cfg.spritePaths.length : 2;
+
+    zone.asteroids = picked.map(a => {
+      a.destroyed = false;
+      a._hitCd = 0;
+      a._spriteIdx = spriteCount > 0 ? rng.int(0, spriteCount - 1) : 0;
+      return a;
+    });
+
+    // Asset load is optional; keeps run-time safe even when the files are missing.
+    this._ensureAsteroidSpritesLoaded();
+  },
+
   // Initialize world with act config
   async init(actId, seed = null) {
     // Load act config
@@ -99,6 +222,10 @@ export const World = {
 
     this.currentZone.depth = depth;
     this.currentZone.mods = activeMods;
+
+    // Select a bounded set of destructible asteroid props (seeded)
+    // to keep performance stable and make them gameplay-relevant.
+    this._prepareAsteroidsForZone(zoneSeed);
 
     this.zoneIndex = index;
     this.activeEnemies = [];
@@ -246,6 +373,60 @@ export const World = {
     }
     
     // Enemy AI (patrol/aggro/return) is handled in Enemies.update() for exploration mode.
+  },
+
+  // Player vs Asteroid collision (block + damage). Kept deterministic and bounded.
+  // Called from main.js after Player.update() so we collide with the new position.
+  resolvePlayerObstacleCollisions(dt, screenW = 800, screenH = 600) {
+    const zone = this.currentZone;
+    if (!zone) return;
+    const asteroids = zone.asteroids || [];
+    if (!asteroids.length) return;
+
+    const cfg = State.data.config?.asteroids || {};
+    const damagePct = (typeof cfg.playerCollisionDamagePct === 'number') ? cfg.playerCollisionDamagePct : 0.05;
+    const hitCooldown = (typeof cfg.playerCollisionCooldown === 'number') ? cfg.playerCollisionCooldown : 0.75;
+    const knockback = (typeof cfg.knockbackStrength === 'number') ? cfg.knockbackStrength : 280;
+
+    const p = State.player;
+    const pR = p.radius || 18;
+
+    for (const a of asteroids) {
+      if (!a || a.destroyed) continue;
+      if (a._hitCd > 0) a._hitCd = Math.max(0, a._hitCd - dt);
+
+      const dx = p.x - a.x;
+      const dy = p.y - a.y;
+      const dist = Math.hypot(dx, dy);
+      const minDist = pR + (a.radius || 50);
+
+      if (dist < minDist) {
+        // Resolve overlap
+        const safeDist = dist > 0.001 ? dist : 0.001;
+        const nx = dx / safeDist;
+        const ny = dy / safeDist;
+        const overlap = minDist - safeDist;
+
+        p.x += nx * overlap;
+        p.y += ny * overlap;
+        p.vx += nx * knockback;
+        p.vy += ny * knockback;
+
+        // Apply damage with cooldown to prevent "frame-melt"
+        if (a._hitCd <= 0) {
+          const maxHP = (typeof p.maxHP === 'number') ? p.maxHP : 100;
+          const dmg = Math.max(1, maxHP * damagePct);
+          Player.takeDamage(dmg);
+          Particles.spawn(p.x, p.y, 'playerHit');
+          a._hitCd = hitCooldown;
+        }
+      }
+    }
+
+    // Clamp back into zone bounds after collision resolution
+    const margin = (pR || 18) + 5;
+    p.x = Math.max(margin, Math.min(zone.width - margin, p.x));
+    p.y = Math.max(margin, Math.min(zone.height - margin, p.y));
   },
   
   // Spawn regular enemy
@@ -488,6 +669,36 @@ export const World = {
       ctx.fill();
     }
     ctx.globalAlpha = 1;
+
+    // Draw asteroid props (destructible, collidable)
+    if (this.currentZone.asteroids && this.currentZone.asteroids.length) {
+      this._ensureAsteroidSpritesLoaded();
+      for (const a of this.currentZone.asteroids) {
+        if (!a || a.destroyed) continue;
+        if (!Camera.isVisible(a.x, a.y, (a.radius || 60) + 100, screenW, screenH)) continue;
+
+        const r = a.radius || 60;
+        ctx.save();
+        ctx.translate(a.x, a.y);
+        ctx.rotate(a.rotation || 0);
+
+        const img = this._asteroidSprites?.length ? this._asteroidSprites[(a._spriteIdx || 0) % this._asteroidSprites.length] : null;
+        if (img && img.complete && img.naturalWidth > 0) {
+          const s = r * 2;
+          ctx.drawImage(img, -s / 2, -s / 2, s, s);
+        } else {
+          // Fallback: vector asteroid
+          ctx.fillStyle = '#555566';
+          ctx.beginPath();
+          ctx.arc(0, 0, r, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = '#333344';
+          ctx.lineWidth = 2;
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+    }
     
     // Draw obstacles
     for (const obs of this.currentZone.obstacles) {

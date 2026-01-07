@@ -212,6 +212,10 @@ const Game = {
     
     // Update player
     Player.update(dt, this.canvas, true); // true = exploration mode
+
+    // Obstacle/prop collisions (Asteroids, mines, etc.)
+    // Runs after player movement, before death check.
+    World.resolvePlayerObstacleCollisions(dt, this.screenW, this.screenH);
     
     // Check death
     if (Player.isDead()) {

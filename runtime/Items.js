@@ -11,7 +11,7 @@ import { getItemData, getRandomAffix } from './DataLoader.js';
 
 export const Items = {
   // Generate a random item
-  generate(baseId, forceRarity = null) {
+  generate(baseId, forceRarity = null, rarityFloor = null) {
     const baseData = getItemData(baseId);
     if (!baseData) {
       console.warn('Items.generate: Unknown item', baseId);
@@ -22,7 +22,16 @@ export const Items = {
     if (!rarities) return null;
     
     // Roll rarity
-    const rarity = forceRarity || this.rollRarity(baseData.rarities);
+    let rarity = forceRarity || this.rollRarity(baseData.rarities);
+
+    // Optional rarity floor (used for elites etc.).
+    // Keeps drops from being hard-locked to a single rarity, while still guaranteeing a minimum tier.
+    if (!forceRarity && rarityFloor) {
+      const RANK = { common: 0, uncommon: 1, rare: 2, epic: 3, legendary: 4, mythic: 5 };
+      const rRank = (RANK[rarity] != null) ? RANK[rarity] : 0;
+      const fRank = (RANK[rarityFloor] != null) ? RANK[rarityFloor] : 0;
+      if (rRank < fRank) rarity = rarityFloor;
+    }
     const rarityData = rarities[rarity];
     
     // Create item
@@ -130,7 +139,7 @@ export const Items = {
   },
   
   // Get random item from any category
-  generateRandom(forceRarity = null) {
+  generateRandom(forceRarity = null, rarityFloor = null) {
     const items = State.data.items;
     if (!items) return null;
     
@@ -145,7 +154,7 @@ export const Items = {
     if (allIds.length === 0) return null;
     
     const randomId = allIds[Math.floor(Math.random() * allIds.length)];
-    return this.generate(randomId, forceRarity);
+    return this.generate(randomId, forceRarity, rarityFloor);
   },
   
   // Add item to stash

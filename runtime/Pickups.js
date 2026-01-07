@@ -98,7 +98,7 @@ export const Pickups = {
         break;
         
       case 'item':
-        const item = Items.generateRandom(pickup.rarity);
+        const item = Items.generateRandom(pickup.rarity, pickup.rarityFloor);
         if (item) {
           const added = Items.addToStash(item);
           if (added) {
