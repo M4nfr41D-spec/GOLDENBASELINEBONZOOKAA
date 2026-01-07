@@ -2,14 +2,14 @@
   "version": "2.2.0",
   "name": "BONZOOKAA!",
   "player": {
-    "baseHP": 800,
-    "baseDamage": 100,
+    "baseHP": 100,
+    "baseDamage": 6,
     "baseSpeed": 320,
     "baseFireRate": 3.5,
     "baseCritChance": 5,
     "baseCritDamage": 150,
-    "basePickupRadius": 160,
-    "bulletSpeed": 1300,
+    "basePickupRadius": 60,
+    "bulletSpeed": 800,
     "acceleration": 3000,
     "friction": 0.65,
     "deadzone": 0.1,
@@ -48,7 +48,7 @@
     "eliteDropChance": 0.3
   },
   "stash": {
-    "baseSlots": 120,
+    "baseSlots": 56,
     "maxSlots": 200
   },
   "effects": {
@@ -71,11 +71,11 @@
   },
   "exploration": {
     "bossEveryNZones": 10,
-    "mapScale": 1.5,
-    "enemyDensityMult": 0.55,
+    "mapScale": 5.0,
+    "enemyDensityMult": 0.35,
     "eliteDensityMult": 0.5,
     "maxEnemySpawnsPerZone": 90,
-    "maxEliteSpawnsPerZone": 15,
+    "maxEliteSpawnsPerZone": 6,
     "enemySpawnMinDistBetween": 190,
     "enemySpawnMinDistFromSpawn": 360,
     "enemySpawnMinDistFromExit": 240,
@@ -83,6 +83,10 @@
     "despawnViewMargin": 1800,
     "portalInteractRadius": 75,
     "enemyAggroRangeMult": 0.7,
-    "enemyFireIntervalMult": 1.75
+    "enemyFireIntervalMult": 1.75,
+    "maxStarsBackground": 1200,
+    "maxStarsMidground": 800,
+    "maxDecorationsPerZone": 4000,
+    "maxObstaclesPerZone": 1500
   }
 }

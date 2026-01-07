@@ -294,12 +294,15 @@ export const MapGenerator = {
   // Obstacles (collision)
   generateObstacles(rng, density, w, h, options = {}) {
     const obstacles = [];
+    const tune = State.data.config?.exploration || {};
+    const maxObs = (typeof tune.maxObstaclesPerZone === 'number') ? tune.maxObstaclesPerZone : 2500;
     const depth = options.depth || 1;
     const mods = options.mods || [];
     const modSet = new Set(mods);
 
-    const count = Math.floor(w * h * density);
-    
+    const countRaw = Math.floor(w * h * density);
+    const count = Math.min(countRaw, maxObs);
+
     for (let i = 0; i < count; i++) {
       const typePool = modSet.has('MINEFIELD') ? ['asteroid','debris','mine','mine'] : ['asteroid','debris'];
       const type = rng.pick(typePool);
@@ -342,7 +345,10 @@ export const MapGenerator = {
   // Decorations (no collision, just visual)
   generateDecorations(rng, biome, w, h) {
     const decorations = [];
-    const count = Math.floor(w * h * 0.001); // Sparse
+    const tune = State.data.config?.exploration || {};
+    const maxDec = (typeof tune.maxDecorationsPerZone === 'number') ? tune.maxDecorationsPerZone : 6000;
+    const countRaw = Math.floor(w * h * 0.001); // Sparse
+    const count = Math.min(countRaw, maxDec);
     
     const types = {
       'space': ['star_cluster', 'nebula_wisp', 'dust_cloud'],
@@ -369,17 +375,20 @@ export const MapGenerator = {
   // Parallax layer generation
   generateParallax(rng, actConfig, w, h) {
     const cfg = actConfig.parallax || {};
+    const tune = State.data.config?.exploration || {};
+    const maxBgStars = (typeof tune.maxStarsBackground === 'number') ? tune.maxStarsBackground : 1800;
+    const maxMidStars = (typeof tune.maxStarsMidground === 'number') ? tune.maxStarsMidground : 1200;
     
     return {
       // Layer 0: Deep background (slowest)
       background: {
         color: cfg.bgColor || '#0a0a15',
-        stars: this.generateStarfield(rng, w * 1.5, h * 1.5, 0.0003),
+        stars: this.generateStarfield(rng, w * 1.5, h * 1.5, 0.0003, maxBgStars),
         scrollSpeed: 0.1
       },
       // Layer 1: Mid stars
       midground: {
-        stars: this.generateStarfield(rng, w * 1.3, h * 1.3, 0.0002),
+        stars: this.generateStarfield(rng, w * 1.3, h * 1.3, 0.0002, maxMidStars),
         scrollSpeed: 0.3
       },
       // Layer 2: Near stars/nebula
@@ -395,10 +404,11 @@ export const MapGenerator = {
   },
   
   // Generate starfield
-  generateStarfield(rng, w, h, density) {
+  generateStarfield(rng, w, h, density, maxCount = null) {
     const stars = [];
-    const count = Math.floor(w * h * density);
-    
+    const countRaw = Math.floor(w * h * density);
+    const count = Math.min(countRaw, maxObs);
+
     for (let i = 0; i < count; i++) {
       stars.push({
         x: rng.range(0, w),
