@@ -15,6 +15,29 @@ export const Player = {
   update(dt, canvas, explorationMode = false) {
     const p = State.player;
     const cfg = State.data.config?.player || {};
+    // ========== CORRUPTION DOT (v0) ==========
+    if (p.dotT && p.dotT > 0) {
+      p.dotT -= dt;
+      this.takeDamage(p.maxHP * (p.dotPct || 0) * dt);
+      if (p.dotT <= 0) { p.dotT = 0; p.dotPct = 0; }
+    }
+
+
+    // ========== CORRUPTION DOT (v0) ==========
+    if (p.dotT && p.dotT > 0) {
+      p.dotT -= dt;
+      this.takeDamage(p.maxHP * (p.dotPct || 0) * dt);
+      if (p.dotT <= 0) { p.dotT = 0; p.dotPct = 0; }
+    }
+
+
+    // ========== CORRUPTION DOT (v0) ==========
+    if (p.dotT && p.dotT > 0) {
+      p.dotT -= dt;
+      this.takeDamage(p.maxHP * (p.dotPct || 0) * dt);
+      if (p.dotT <= 0) { p.dotT = 0; p.dotPct = 0; }
+    }
+
     
     // ========== MOVEMENT (WASD) ==========
     const move = Input.getMovement();
@@ -154,6 +177,14 @@ export const Player = {
     }
   },
   
+  applyDot(dot) {
+    const p = State.player;
+    const dur = (dot && dot.duration) ? dot.duration : 4.0;
+    const pct = (dot && dot.dpsPctMaxHp) ? dot.dpsPctMaxHp : 0.01;
+    p.dotT = Math.max(p.dotT || 0, dur);
+    p.dotPct = Math.max(p.dotPct || 0, pct);
+  },
+
   isDead() {
     return State.player.hp <= 0;
   },

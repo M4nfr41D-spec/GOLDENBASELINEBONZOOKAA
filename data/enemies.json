@@ -22,7 +22,7 @@
       "xp": 7,
       "pattern": "zigzag",
       "color": "#44aaff",
-      "shootInterval": 2.0
+      "shootInterval": 2
     },
     "diver": {
       "name": "Diver",
@@ -47,9 +47,28 @@
       "pattern": "straight",
       "color": "#888888",
       "shootInterval": 1.5
+    },
+    "corrupted": {
+      "name": "Corrupted Spawn",
+      "icon": "☣️",
+      "hp": 45,
+      "damage": 4,
+      "speed": 55,
+      "score": 55,
+      "xp": 28,
+      "pattern": "strafe",
+      "color": "#c6a24a",
+      "shootInterval": 0.45,
+      "abilities": [
+        "corruptDot"
+      ],
+      "dot": {
+        "duration": 4,
+        "tick": 0.5,
+        "dpsPctMaxHp": 0.01
+      }
     }
   },
-  
   "elite": {
     "commander": {
       "name": "Commander",
@@ -62,7 +81,10 @@
       "pattern": "command",
       "color": "#ffaa00",
       "shootInterval": 1.2,
-      "abilities": ["summon", "shield"]
+      "abilities": [
+        "summon",
+        "shield"
+      ]
     },
     "berserker": {
       "name": "Berserker",
@@ -75,7 +97,9 @@
       "pattern": "charge",
       "color": "#ff2222",
       "shootInterval": 0.8,
-      "abilities": ["enrage"]
+      "abilities": [
+        "enrage"
+      ]
     },
     "sniper": {
       "name": "Sniper",
@@ -88,10 +112,11 @@
       "pattern": "strafe",
       "color": "#aa44ff",
       "shootInterval": 2.5,
-      "abilities": ["aimShot"]
+      "abilities": [
+        "aimShot"
+      ]
     }
   },
-  
   "bosses": {
     "sentinel": {
       "name": "Sentinel Alpha",
@@ -105,7 +130,11 @@
       "color": "#ff8800",
       "shootInterval": 0.6,
       "phases": 3,
-      "abilities": ["laser_sweep", "spawn_adds", "shield_phase"]
+      "abilities": [
+        "laser_sweep",
+        "spawn_adds",
+        "shield_phase"
+      ]
     },
     "collector": {
       "name": "The Collector",
@@ -119,7 +148,11 @@
       "color": "#aa00ff",
       "shootInterval": 0.5,
       "phases": 4,
-      "abilities": ["tractor_beam", "drone_swarm", "teleport"]
+      "abilities": [
+        "tractor_beam",
+        "drone_swarm",
+        "teleport"
+      ]
     },
     "harbinger": {
       "name": "Harbinger",
@@ -133,81 +166,163 @@
       "color": "#ff0044",
       "shootInterval": 0.4,
       "phases": 5,
-      "abilities": ["void_beam", "meteor_shower", "time_slow", "rage_mode"]
+      "abilities": [
+        "void_beam",
+        "meteor_shower",
+        "time_slow",
+        "rage_mode"
+      ]
     }
   },
-  
   "patterns": {
     "straight": {
       "description": "Move straight down",
-      "movement": [{ "dy": 1, "duration": -1 }]
+      "movement": [
+        {
+          "dy": 1,
+          "duration": -1
+        }
+      ]
     },
     "zigzag": {
       "description": "Zigzag left and right",
       "movement": [
-        { "dx": 1, "dy": 0.3, "duration": 0.5 },
-        { "dx": -1, "dy": 0.3, "duration": 0.5 }
+        {
+          "dx": 1,
+          "dy": 0.3,
+          "duration": 0.5
+        },
+        {
+          "dx": -1,
+          "dy": 0.3,
+          "duration": 0.5
+        }
       ],
       "loop": true
     },
     "dive": {
       "description": "Slow then fast dive",
       "movement": [
-        { "dy": 0.3, "duration": 1.5 },
-        { "dy": 2, "duration": 1 }
+        {
+          "dy": 0.3,
+          "duration": 1.5
+        },
+        {
+          "dy": 2,
+          "duration": 1
+        }
       ]
     },
     "snake": {
       "description": "S-curve pattern",
       "movement": [
-        { "dx": 0.8, "dy": 0.5, "duration": 0.8 },
-        { "dx": -0.8, "dy": 0.5, "duration": 0.8 }
+        {
+          "dx": 0.8,
+          "dy": 0.5,
+          "duration": 0.8
+        },
+        {
+          "dx": -0.8,
+          "dy": 0.5,
+          "duration": 0.8
+        }
       ],
       "loop": true
     },
     "charge": {
       "description": "Wait then charge at player",
       "movement": [
-        { "dy": 0.2, "duration": 1 },
-        { "target": "player", "speed": 2, "duration": 2 }
+        {
+          "dy": 0.2,
+          "duration": 1
+        },
+        {
+          "target": "player",
+          "speed": 2,
+          "duration": 2
+        }
       ]
     },
     "strafe": {
       "description": "Move to side, stop and shoot",
       "movement": [
-        { "dx": 1, "dy": 0.3, "duration": 1.5 },
-        { "stop": true, "shoot": true, "duration": 2 },
-        { "dx": -1, "dy": 0.3, "duration": 1.5 }
+        {
+          "dx": 1,
+          "dy": 0.3,
+          "duration": 1.5
+        },
+        {
+          "stop": true,
+          "shoot": true,
+          "duration": 2
+        },
+        {
+          "dx": -1,
+          "dy": 0.3,
+          "duration": 1.5
+        }
       ],
       "loop": true
     }
   },
-  
   "waveCompositions": {
     "1-5": {
-      "pool": ["grunt"],
-      "count": [4, 6],
+      "pool": [
+        "grunt"
+      ],
+      "count": [
+        4,
+        6
+      ],
       "eliteChance": 0
     },
     "6-10": {
-      "pool": ["grunt", "scout"],
-      "count": [5, 8],
+      "pool": [
+        "grunt",
+        "scout"
+      ],
+      "count": [
+        5,
+        8
+      ],
       "eliteChance": 0.05
     },
     "11-20": {
-      "pool": ["grunt", "scout", "diver"],
-      "count": [6, 10],
-      "eliteChance": 0.10
+      "pool": [
+        "grunt",
+        "scout",
+        "diver"
+      ],
+      "count": [
+        6,
+        10
+      ],
+      "eliteChance": 0.1
     },
     "21-30": {
-      "pool": ["grunt", "scout", "diver", "tank"],
-      "count": [8, 12],
+      "pool": [
+        "grunt",
+        "scout",
+        "diver",
+        "tank"
+      ],
+      "count": [
+        8,
+        12
+      ],
       "eliteChance": 0.15
     },
     "31+": {
-      "pool": ["scout", "diver", "tank"],
-      "count": [10, 15],
-      "eliteChance": 0.20
+      "pool": [
+        "scout",
+        "diver",
+        "tank"
+      ],
+      "count": [
+        10,
+        15
+      ],
+      "eliteChance": 0.2
     }
   }
 }

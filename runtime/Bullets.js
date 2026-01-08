@@ -160,6 +160,7 @@ export const Bullets = {
       const dist = Math.hypot(b.x - p.x, b.y - p.y);
       if (dist < b.size + 15) {
         Player.takeDamage(b.damage);
+        if (b.dot) Player.applyDot(b.dot);
         State.enemyBullets.splice(i, 1);
       }
     }

@@ -6,15 +6,26 @@
     "unlocked": true,
     "zones": 4,
     "generation": {
-      "width": [1800, 2500],
-      "height": [1800, 2500],
+      "width": [
+        1800,
+        2500
+      ],
+      "height": [
+        1800,
+        2500
+      ],
       "enemyDensity": 0.0004,
-      "eliteDensity": 0.00008,
+      "eliteDensity": 8e-05,
       "obstacleDensity": 0.00025
     },
     "enemies": {
-      "pool": ["grunt", "scout"],
-      "elitePool": ["commander"]
+      "pool": [
+        "grunt",
+        "scout"
+      ],
+      "elitePool": [
+        "commander"
+      ]
     },
     "boss": {
       "type": "sentinel",
@@ -31,10 +42,11 @@
     },
     "rewards": {
       "completionScrap": 500,
-      "unlocks": ["act2"]
+      "unlocks": [
+        "act2"
+      ]
     }
   },
-  
   "act2": {
     "name": "Nebula Depths",
     "description": "Descend into the toxic nebula clouds",
@@ -42,15 +54,29 @@
     "unlocked": false,
     "zones": 5,
     "generation": {
-      "width": [2000, 3000],
-      "height": [2000, 3000],
+      "width": [
+        2000,
+        3000
+      ],
+      "height": [
+        2000,
+        3000
+      ],
       "enemyDensity": 0.0005,
       "eliteDensity": 0.0001,
       "obstacleDensity": 0.0002
     },
     "enemies": {
-      "pool": ["grunt", "scout", "diver"],
-      "elitePool": ["commander", "sniper"]
+      "pool": [
+        "grunt",
+        "scout",
+        "diver"
+      ],
+      "elitePool": [
+        "commander",
+        "corrupted",
+        "sniper"
+      ]
     },
     "boss": {
       "type": "collector",
@@ -67,10 +93,11 @@
     },
     "rewards": {
       "completionScrap": 1000,
-      "unlocks": ["act3"]
+      "unlocks": [
+        "act3"
+      ]
     }
   },
-  
   "act3": {
     "name": "The Void",
     "description": "Face the darkness at the edge of known space",
@@ -78,15 +105,29 @@
     "unlocked": false,
     "zones": 6,
     "generation": {
-      "width": [2500, 3500],
-      "height": [2500, 3500],
+      "width": [
+        2500,
+        3500
+      ],
+      "height": [
+        2500,
+        3500
+      ],
       "enemyDensity": 0.0006,
       "eliteDensity": 0.00012,
       "obstacleDensity": 0.00015
     },
     "enemies": {
-      "pool": ["scout", "diver", "tank"],
-      "elitePool": ["commander", "sniper", "berserker"]
+      "pool": [
+        "scout",
+        "diver",
+        "tank"
+      ],
+      "elitePool": [
+        "commander",
+        "sniper",
+        "berserker"
+      ]
     },
     "boss": {
       "type": "harbinger",

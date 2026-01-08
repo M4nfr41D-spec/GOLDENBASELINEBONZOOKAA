@@ -66,20 +66,29 @@ export const Enemies = {
       dead: false
     };
 
+
     // Ability-specific state (kept minimal and self-contained)
-    if (enemy.abilities.includes('aimShot')) {
-      enemy.aim = {
-        state: 'cooldown',
-        t: 0,
-        windup: 0.9,
-        pulseWindow: 0.18,
-        lastAngle: 0
-      };
-      // Optional sprite (falls back to default diamond)
-      enemy.spritePath = './assets/enemies/enemy_sniper.png';
-    }
+        if (enemy.abilities.includes('aimShot')) {
+          enemy.aim = {
+            state: 'cooldown',
+            t: 0,
+            windup: 0.9,
+            pulseWindow: 0.18,
+            lastAngle: 0
+          };
+          // Sprite: asset is 'nose up', so +PI/2 rotation offset in draw()
+          enemy.spritePath = './assets/enemies/enemy_sniper.png';
+          enemy.spriteRotOffset = Math.PI / 2;
+        }
     
-    State.enemies.push(enemy);
+        if (enemy.abilities.includes('corruptDot')) {
+          enemy.spritePath = './assets/enemies/enemy_corrupted_spawn.png';
+          // Sprite: asset is 'nose right'
+          enemy.spriteRotOffset = 0;
+          enemy.dot = (enemyData && enemyData.dot) ? enemyData.dot : { duration: 4.0, tick: 0.5, dpsPctMaxHp: 0.01 };
+        }
+    
+        State.enemies.push(enemy);
     return enemy;
   },
   
@@ -467,7 +476,8 @@ export const Enemies = {
       vx: Math.cos(angle) * speed,
       vy: Math.sin(angle) * speed,
       damage: e.damage,
-      size: e.isBoss ? 8 : 5
+      size: e.isBoss ? 8 : 5,
+      dot: (e.abilities && e.abilities.includes("corruptDot")) ? (e.dot || { duration: 4.0, tick: 0.5, dpsPctMaxHp: 0.01 }) : null
     });
   },
   
