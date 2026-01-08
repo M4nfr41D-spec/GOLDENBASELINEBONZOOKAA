@@ -7,6 +7,17 @@
 
 import { State } from './State.js';
 
+// Lightweight sprite cache (no global asset pipeline required)
+const _spriteCache = {};
+function getSprite(path) {
+  if (!path) return null;
+  if (_spriteCache[path]) return _spriteCache[path];
+  const img = new Image();
+  img.src = path;
+  _spriteCache[path] = img;
+  return img;
+}
+
 export const Enemies = {
   // Spawn an enemy
   spawn(type, x, y, isElite = false, isBoss = false) {
@@ -48,11 +59,25 @@ export const Enemies = {
       isElite: isElite,
       isBoss: isBoss,
       pattern: enemyData.pattern,
+      abilities: Array.isArray(enemyData.abilities) ? enemyData.abilities.slice() : [],
       patternTime: 0,
       shootTimer: shootInterval * (0.5 + Math.random() * 0.8),
       shootInterval: shootInterval,
       dead: false
     };
+
+    // Ability-specific state (kept minimal and self-contained)
+    if (enemy.abilities.includes('aimShot')) {
+      enemy.aim = {
+        state: 'cooldown',
+        t: 0,
+        windup: 0.9,
+        pulseWindow: 0.18,
+        lastAngle: 0
+      };
+      // Optional sprite (falls back to default diamond)
+      enemy.spritePath = './assets/enemies/enemy_sniper.png';
+    }
     
     State.enemies.push(enemy);
     return enemy;
@@ -333,12 +358,60 @@ export const Enemies = {
     const dist = Math.hypot(p.x - e.x, p.y - e.y);
     if (dist > e.attackRange) return;
 
+    // Sniper special (aimShot): telegraphed windup then high-velocity shot
+    if (e.abilities && e.abilities.includes('aimShot') && e.aim) {
+      const aim = e.aim;
+      if (aim.state === 'cooldown') {
+        e.shootTimer -= dt;
+        if (e.shootTimer <= 0) {
+          aim.state = 'windup';
+          aim.t = 0;
+          // Cache the angle at start (reduces jitter)
+          aim.lastAngle = Math.atan2(p.y - e.y, p.x - e.x);
+        }
+        return;
+      }
+
+      if (aim.state === 'windup') {
+        aim.t += dt;
+        // Track target slowly during windup for fairness
+        const targetAngle = Math.atan2(p.y - e.y, p.x - e.x);
+        const trackRate = 4.0; // rad/s
+        const delta = ((targetAngle - aim.lastAngle + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
+        aim.lastAngle += Math.max(-trackRate * dt, Math.min(trackRate * dt, delta));
+
+        if (aim.t >= aim.windup) {
+          // Fire
+          this.shootSniper(e, aim.lastAngle);
+          // Reset cooldown
+          aim.state = 'cooldown';
+          aim.t = 0;
+          e.shootTimer = e.shootInterval + Math.random() * 0.35;
+        }
+        return;
+      }
+    }
+
     e.shootTimer -= dt;
     if (e.shootTimer <= 0) {
       // Light jitter to avoid perfectly deterministic bullet streams
       e.shootTimer = e.shootInterval + Math.random() * 0.35;
       this.shoot(e);
     }
+  },
+
+  shootSniper(e, angle) {
+    const speed = 560;
+    State.enemyBullets.push({
+      x: e.x,
+      y: e.y + e.size * 0.2,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      damage: e.damage,
+      size: 6,
+      // tag for potential future FX
+      isSniper: true
+    });
   },
   
   // Apply movement pattern
@@ -459,11 +532,69 @@ export const Enemies = {
   draw(ctx) {
     for (const e of State.enemies) {
       if (e.dead) continue;
+
+      // Sniper telegraph (world-space; camera already applied)
+      if (e.aim && e.aim.state === 'windup') {
+        const p = State.player;
+        const aim = e.aim;
+        const t = Math.min(1, aim.t / Math.max(0.001, aim.windup));
+        // Line
+        ctx.save();
+        ctx.globalAlpha = 0.25 + 0.35 * t;
+        ctx.strokeStyle = '#c070ff';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(e.x, e.y);
+        ctx.lineTo(p.x, p.y);
+        ctx.stroke();
+
+        // Glow pulse shortly before shot
+        const timeLeft = Math.max(0, aim.windup - aim.t);
+        if (timeLeft <= aim.pulseWindow) {
+          const pulseT = 1 - (timeLeft / Math.max(0.001, aim.pulseWindow));
+          ctx.globalAlpha = 0.35 + 0.45 * pulseT;
+          ctx.fillStyle = '#ffdd88';
+          ctx.shadowColor = '#ffdd88';
+          ctx.shadowBlur = 22;
+          const r = e.size * (0.35 + 0.25 * pulseT);
+          ctx.beginPath();
+          ctx.arc(e.x, e.y, r, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.shadowBlur = 0;
+        }
+        ctx.restore();
+      }
       
       ctx.fillStyle = e.color;
       ctx.shadowColor = e.color;
       ctx.shadowBlur = e.isBoss ? 25 : (e.isElite ? 18 : 10);
       
+      // Optional sprite rendering (sniper). Falls back to default shape.
+      if (e.spritePath) {
+        const img = getSprite(e.spritePath);
+        if (img && img.complete && img.naturalWidth > 0) {
+          // Preserve sprite aspect (taller than wide)
+          const targetH = e.size * 3.0;
+          const targetW = targetH * (img.naturalWidth / img.naturalHeight);
+          ctx.drawImage(img, e.x - targetW / 2, e.y - targetH / 2, targetW, targetH);
+          ctx.shadowBlur = 0;
+          // HP bar still drawn below
+          // Continue to next enemy draw (avoid double-drawing shape)
+          // (Bosses never use spritePath in v9A1)
+          
+          // HP bar
+          if (e.hp < e.maxHP) {
+            const barW = e.size * 2;
+            const pct = e.hp / e.maxHP;
+            ctx.fillStyle = 'rgba(0,0,0,0.6)';
+            ctx.fillRect(e.x - barW / 2, e.y - e.size - 12, barW, 6);
+            ctx.fillStyle = pct > 0.5 ? '#00ff88' : pct > 0.25 ? '#ffaa00' : '#ff4444';
+            ctx.fillRect(e.x - barW / 2 + 1, e.y - e.size - 11, (barW - 2) * pct, 4);
+          }
+          continue;
+        }
+      }
+
       if (e.isBoss) {
         ctx.beginPath();
         for (let i = 0; i < 6; i++) {
