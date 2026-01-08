@@ -402,14 +402,19 @@ export const Enemies = {
 
   shootSniper(e, angle) {
     const speed = 560;
+
+    // Spawn from the "nose" of the sprite (along aim angle), not from a fixed Y offset.
+    const ox = Math.cos(angle) * (e.size * 1.1);
+    const oy = Math.sin(angle) * (e.size * 1.1);
+
     State.enemyBullets.push({
-      x: e.x,
-      y: e.y + e.size * 0.2,
+      x: e.x + ox,
+      y: e.y + oy,
       vx: Math.cos(angle) * speed,
       vy: Math.sin(angle) * speed,
       damage: e.damage,
       size: 6,
-      // tag for potential future FX
+      // tag for potential future FX / rendering tweaks
       isSniper: true
     });
   },
@@ -576,7 +581,18 @@ export const Enemies = {
           // Preserve sprite aspect (taller than wide)
           const targetH = e.size * 3.0;
           const targetW = targetH * (img.naturalWidth / img.naturalHeight);
-          ctx.drawImage(img, e.x - targetW / 2, e.y - targetH / 2, targetW, targetH);
+
+          // Rotate sprite to face target. Asset is "nose up" (negative Y), so apply +PI/2 offset.
+          const p = State.player;
+          let ang = Math.atan2(p.y - e.y, p.x - e.x);
+          if (e.aim && typeof e.aim.lastAngle === 'number') ang = e.aim.lastAngle;
+          const rot = ang + Math.PI / 2;
+
+          ctx.save();
+          ctx.translate(e.x, e.y);
+          ctx.rotate(rot);
+          ctx.drawImage(img, -targetW / 2, -targetH / 2, targetW, targetH);
+          ctx.restore();
           ctx.shadowBlur = 0;
           // HP bar still drawn below
           // Continue to next enemy draw (avoid double-drawing shape)
