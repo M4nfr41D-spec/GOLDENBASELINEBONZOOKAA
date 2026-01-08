@@ -16,30 +16,20 @@ export const Player = {
     const p = State.player;
     const cfg = State.data.config?.player || {};
     // ========== CORRUPTION DOT (v0) ==========
+    // DOT bypasses shield (HP-only) and is refresh-only via bullet hits.
     if (p.dotT && p.dotT > 0) {
       p.dotT -= dt;
-      this.takeDamage(p.maxHP * (p.dotPct || 0) * dt);
+      const dmg = p.maxHP * (p.dotPct || 0) * dt;
+      p.hp = Math.max(0, p.hp - dmg);
+      p.corruptFx = Math.min(0.35, (p.corruptFx || 0) + dt); // used for green FX in draw
       if (p.dotT <= 0) { p.dotT = 0; p.dotPct = 0; }
     }
 
-
-    // ========== CORRUPTION DOT (v0) ==========
-    if (p.dotT && p.dotT > 0) {
-      p.dotT -= dt;
-      this.takeDamage(p.maxHP * (p.dotPct || 0) * dt);
-      if (p.dotT <= 0) { p.dotT = 0; p.dotPct = 0; }
-    }
+    if (p.corruptFx && p.corruptFx > 0) p.corruptFx = Math.max(0, p.corruptFx - dt);
 
 
-    // ========== CORRUPTION DOT (v0) ==========
-    if (p.dotT && p.dotT > 0) {
-      p.dotT -= dt;
-      this.takeDamage(p.maxHP * (p.dotPct || 0) * dt);
-      if (p.dotT <= 0) { p.dotT = 0; p.dotPct = 0; }
-    }
 
-    
-    // ========== MOVEMENT (WASD) ==========
+// ========== MOVEMENT (WASD) ==========
     const move = Input.getMovement();
     
     // Config-driven movement (defaults for snappy feel)
@@ -183,6 +173,7 @@ export const Player = {
     const pct = (dot && dot.dpsPctMaxHp) ? dot.dpsPctMaxHp : 0.01;
     p.dotT = Math.max(p.dotT || 0, dur);
     p.dotPct = Math.max(p.dotPct || 0, pct);
+    p.corruptFx = 0.35;
   },
 
   isDead() {
@@ -216,7 +207,20 @@ export const Player = {
     ctx.lineWidth = 2;
     ctx.stroke();
     
-    // Engine glow when moving
+    
+    // Corruption FX overlay (green) when DOT active
+    if (p.corruptFx && p.corruptFx > 0) {
+      ctx.save();
+      ctx.globalAlpha = Math.min(0.35, p.corruptFx);
+      ctx.strokeStyle = '#41ff78';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(0, 0, 22, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+// Engine glow when moving
     const isMoving = Math.abs(p.vx) > 10 || Math.abs(p.vy) > 10;
     if (isMoving) {
       ctx.beginPath();

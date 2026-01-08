@@ -79,6 +79,11 @@ export const Enemies = {
           // Sprite: asset is 'nose up', so +PI/2 rotation offset in draw()
           enemy.spritePath = './assets/enemies/enemy_sniper.png';
           enemy.spriteRotOffset = Math.PI / 2;
+          // Sniper needs long acquisition/attack ranges (half-screen+)
+          enemy.aggroRange = 920;
+          enemy.attackRange = 920;
+          enemy.disengageRange = 1350;
+
         }
     
         if (enemy.abilities.includes('corruptDot')) {
@@ -86,6 +91,13 @@ export const Enemies = {
           // Sprite: asset is 'nose right'
           enemy.spriteRotOffset = 0;
           enemy.dot = (enemyData && enemyData.dot) ? enemyData.dot : { duration: 4.0, tick: 0.5, dpsPctMaxHp: 0.01 };
+          // Visual tuning: poisonous green, less lantern-glow, bigger body
+          enemy.color = '#41ff78';
+          enemy.shadowBlurOverride = 6;
+          enemy.size = 44; // 2x basic
+          enemy.aggroRange = 680;
+          enemy.attackRange = 680;
+
         }
     
         State.enemies.push(enemy);
@@ -410,7 +422,7 @@ export const Enemies = {
   },
 
   shootSniper(e, angle) {
-    const speed = 560;
+    const speed = 1120;
 
     // Spawn from the "nose" of the sprite (along aim angle), not from a fixed Y offset.
     const ox = Math.cos(angle) * (e.size * 1.1);
@@ -477,7 +489,8 @@ export const Enemies = {
       vy: Math.sin(angle) * speed,
       damage: e.damage,
       size: e.isBoss ? 8 : 5,
-      dot: (e.abilities && e.abilities.includes("corruptDot")) ? (e.dot || { duration: 4.0, tick: 0.5, dpsPctMaxHp: 0.01 }) : null
+      dot: (e.abilities && e.abilities.includes("corruptDot")) ? (e.dot || { duration: 4.0, tick: 0.5, dpsPctMaxHp: 0.01 }) : null,
+      color: (e.abilities && e.abilities.includes("corruptDot")) ? "#41ff78" : undefined
     });
   },
   
@@ -582,7 +595,7 @@ export const Enemies = {
       
       ctx.fillStyle = e.color;
       ctx.shadowColor = e.color;
-      ctx.shadowBlur = e.isBoss ? 25 : (e.isElite ? 18 : 10);
+      ctx.shadowBlur = (typeof e.shadowBlurOverride === 'number') ? e.shadowBlurOverride : (e.isBoss ? 25 : (e.isElite ? 18 : 10));
       
       // Optional sprite rendering (sniper). Falls back to default shape.
       if (e.spritePath) {
