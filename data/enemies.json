@@ -2,7 +2,7 @@
   "basic": {
     "grunt": {
       "name": "Grunt",
-      "icon": "👾",
+      "icon": "\ud83d\udc7e",
       "hp": 40,
       "damage": 8,
       "speed": 70,
@@ -14,7 +14,7 @@
     },
     "scout": {
       "name": "Scout",
-      "icon": "🛸",
+      "icon": "\ud83d\udef8",
       "hp": 25,
       "damage": 5,
       "speed": 110,
@@ -26,7 +26,7 @@
     },
     "diver": {
       "name": "Diver",
-      "icon": "🔻",
+      "icon": "\ud83d\udd3b",
       "hp": 35,
       "damage": 12,
       "speed": 140,
@@ -38,7 +38,7 @@
     },
     "tank": {
       "name": "Tank",
-      "icon": "🔷",
+      "icon": "\ud83d\udd37",
       "hp": 100,
       "damage": 15,
       "speed": 35,
@@ -50,14 +50,14 @@
     },
     "corrupted": {
       "name": "Corrupted Spawn",
-      "icon": "☣️",
+      "icon": "\u2623\ufe0f",
       "hp": 45,
       "damage": 4,
       "speed": 55,
       "score": 55,
       "xp": 28,
       "pattern": "strafe",
-      "color": "#c6a24a",
+      "color": "#41ff78",
       "shootInterval": 0.45,
       "abilities": [
         "corruptDot"
@@ -66,13 +66,17 @@
         "duration": 4,
         "tick": 0.5,
         "dpsPctMaxHp": 0.01
-      }
+      },
+      "size": 44,
+      "attackRange": 680,
+      "aggroRange": 680,
+      "bulletColor": "#41ff78"
     }
   },
   "elite": {
     "commander": {
       "name": "Commander",
-      "icon": "⭐",
+      "icon": "\u2b50",
       "hp": 150,
       "damage": 20,
       "speed": 50,
@@ -88,7 +92,7 @@
     },
     "berserker": {
       "name": "Berserker",
-      "icon": "💢",
+      "icon": "\ud83d\udca2",
       "hp": 120,
       "damage": 30,
       "speed": 90,
@@ -103,7 +107,7 @@
     },
     "sniper": {
       "name": "Sniper",
-      "icon": "🎯",
+      "icon": "\ud83c\udfaf",
       "hp": 60,
       "damage": 40,
       "speed": 25,
@@ -114,13 +118,16 @@
       "shootInterval": 2.5,
       "abilities": [
         "aimShot"
-      ]
+      ],
+      "attackRange": 920,
+      "aggroRange": 920,
+      "shootSpeed": 1120
     }
   },
   "bosses": {
     "sentinel": {
       "name": "Sentinel Alpha",
-      "icon": "👑",
+      "icon": "\ud83d\udc51",
       "hp": 800,
       "damage": 25,
       "speed": 35,
@@ -138,7 +145,7 @@
     },
     "collector": {
       "name": "The Collector",
-      "icon": "🕷️",
+      "icon": "\ud83d\udd77\ufe0f",
       "hp": 1200,
       "damage": 30,
       "speed": 45,
@@ -156,7 +163,7 @@
     },
     "harbinger": {
       "name": "Harbinger",
-      "icon": "💀",
+      "icon": "\ud83d\udc80",
       "hp": 2000,
       "damage": 45,
       "speed": 55,
