@@ -79,11 +79,6 @@ export const Enemies = {
           // Sprite: asset is 'nose up', so +PI/2 rotation offset in draw()
           enemy.spritePath = './assets/enemies/enemy_sniper.png';
           enemy.spriteRotOffset = Math.PI / 2;
-          // Sniper needs long acquisition/attack ranges (half-screen+)
-          enemy.aggroRange = 920;
-          enemy.attackRange = 920;
-          enemy.disengageRange = 1350;
-
         }
     
         if (enemy.abilities.includes('corruptDot')) {
@@ -91,16 +86,24 @@ export const Enemies = {
           // Sprite: asset is 'nose right'
           enemy.spriteRotOffset = 0;
           enemy.dot = (enemyData && enemyData.dot) ? enemyData.dot : { duration: 4.0, tick: 0.5, dpsPctMaxHp: 0.01 };
-          // Visual tuning: poisonous green, less lantern-glow, bigger body
-          enemy.color = '#41ff78';
-          enemy.shadowBlurOverride = 6;
-          enemy.size = 44; // 2x basic
-          enemy.aggroRange = 680;
-          enemy.attackRange = 680;
-
         }
     
-        State.enemies.push(enemy);
+        
+
+if (enemy.abilities.includes('repairTether')) {
+  // Support drone: seeks an ally and repairs it while staying near (tether heal)
+  enemy.spritePath = null; // optional later
+  enemy.spriteRotOffset = 0;
+  const r = (enemyData && enemyData.repair) ? enemyData.repair : {};
+  enemy.repair = {
+    range: (typeof r.range === 'number') ? r.range : 260,
+    healPctMaxHpPerSec: (typeof r.healPctMaxHpPerSec === 'number') ? r.healPctMaxHpPerSec : 0.03,
+    capPctMaxHpPerSec: (typeof r.capPctMaxHpPerSec === 'number') ? r.capPctMaxHpPerSec : 0.04
+  };
+  enemy.tether = { targetId: null };
+  enemy.orbit = { t: 0, radius: 90 };
+}
+State.enemies.push(enemy);
     return enemy;
   },
   
@@ -192,6 +195,10 @@ export const Enemies = {
     const zone = State.world?.currentZone;
     const inWorld = !!zone;
 
+    // Per-frame heal budgets (prevents stacking exploits)
+    const healBudget = Object.create(null);
+    this._healBudget = healBudget;
+
     for (const e of State.enemies) {
       if (e.dead) continue;
 
@@ -236,8 +243,15 @@ export const Enemies = {
   },
 
   // Exploration AI: patrol at spawn point, aggro in range, return when player leaves
-  updateExplorationAI(e, dt, zone) {
-    const p = State.player;
+  updateExplorationAI\(e, dt, zone\) \{
+    const p = State\.player;
+
+    // Repair drone overrides base AI
+    if (e.abilities && e.abilities.includes('repairTether')) {
+      this.updateRepairDroneAI(e, dt, zone);
+      return;
+    }
+
     const tune = State.data.config?.exploration || {};
     const aggroMult = (typeof tune.enemyAggroRangeMult === 'number') ? tune.enemyAggroRangeMult : 1.0;
 
@@ -373,7 +387,72 @@ export const Enemies = {
     }
   },
 
-  updateExplorationShooting(e, dt) {
+  
+// Support AI: repair drone tethers to a nearby ally and heals it (capped per target per second)
+updateRepairDroneAI(e, dt, zone) {
+  const p = State.player;
+  const cfg = e.repair || { range: 260, healPctMaxHpPerSec: 0.03, capPctMaxHpPerSec: 0.04 };
+
+  // Pick target: nearest non-dead ally, prefer elites/bosses
+  let best = null;
+  let bestScore = -1e9;
+  for (const other of State.enemies) {
+    if (!other || other.dead || other.id === e.id) continue;
+    if (other.abilities && other.abilities.includes('repairTether')) continue; // don't heal other repair drones
+    const dx = other.x - e.x;
+    const dy = other.y - e.y;
+    const d = Math.hypot(dx, dy);
+    if (d > 650) continue;
+    const prio = (other.isBoss ? 1000 : (other.isElite ? 200 : 0));
+    const missing = Math.max(0, other.maxHP - other.hp);
+    const score = prio + missing - d * 0.25;
+    if (score > bestScore) { bestScore = score; best = other; }
+  }
+
+  if (best) {
+    e.tether.targetId = best.id;
+
+    // Orbit near target
+    e.orbit.t += dt;
+    const ang = e.orbit.t * 1.2 + (e.id.charCodeAt(e.id.length-1) % 6);
+    const desiredX = best.x + Math.cos(ang) * e.orbit.radius;
+    const desiredY = best.y + Math.sin(ang) * e.orbit.radius;
+    const dx = desiredX - e.x;
+    const dy = desiredY - e.y;
+    const dist = Math.hypot(dx, dy) || 1;
+    const sp = e.speed || 90;
+    e.vx = (dx / dist) * sp;
+    e.vy = (dy / dist) * sp;
+
+    // Apply heal if within range
+    const dToTarget = Math.hypot(best.x - e.x, best.y - e.y);
+    if (dToTarget <= cfg.range && best.hp > 0 && best.hp < best.maxHP) {
+      const want = best.maxHP * cfg.healPctMaxHpPerSec * dt;
+      const cap = best.maxHP * cfg.capPctMaxHpPerSec * dt;
+
+      const hb = this._healBudget || Object.create(null);
+      const used = hb[best.id] || 0;
+      const grant = Math.max(0, Math.min(want, cap - used));
+      if (grant > 0) {
+        best.hp = Math.min(best.maxHP, best.hp + grant);
+        hb[best.id] = used + grant;
+      }
+    }
+    return;
+  }
+
+  // No target: behave like normal patrol/aggro drift (fallback)
+  e.tether.targetId = null;
+  // Light drift toward player to stay relevant
+  const dx = p.x - e.x;
+  const dy = p.y - e.y;
+  const d = Math.hypot(dx, dy) || 1;
+  const sp = (e.speed || 90) * 0.4;
+  e.vx = (dx / d) * sp;
+  e.vy = (dy / d) * sp;
+},
+
+updateExplorationShooting(e, dt) {
     if (e.aiState !== 'aggro') return;
     const p = State.player;
     const dist = Math.hypot(p.x - e.x, p.y - e.y);
@@ -422,7 +501,7 @@ export const Enemies = {
   },
 
   shootSniper(e, angle) {
-    const speed = 1120;
+    const speed = 560;
 
     // Spawn from the "nose" of the sprite (along aim angle), not from a fixed Y offset.
     const ox = Math.cos(angle) * (e.size * 1.1);
@@ -489,8 +568,7 @@ export const Enemies = {
       vy: Math.sin(angle) * speed,
       damage: e.damage,
       size: e.isBoss ? 8 : 5,
-      dot: (e.abilities && e.abilities.includes("corruptDot")) ? (e.dot || { duration: 4.0, tick: 0.5, dpsPctMaxHp: 0.01 }) : null,
-      color: (e.abilities && e.abilities.includes("corruptDot")) ? "#41ff78" : undefined
+      dot: (e.abilities && e.abilities.includes("corruptDot")) ? (e.dot || { duration: 4.0, tick: 0.5, dpsPctMaxHp: 0.01 }) : null
     });
   },
   
@@ -593,9 +671,34 @@ export const Enemies = {
         ctx.restore();
       }
       
+
+
+// Repair tether visualization
+if (e.abilities && e.abilities.includes('repairTether') && e.tether && e.tether.targetId) {
+  const target = State.enemies.find(o => o.id === e.tether.targetId && !o.dead);
+  if (target) {
+    ctx.save();
+    ctx.globalAlpha = 0.35;
+    ctx.strokeStyle = '#66ddff';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(e.x, e.y);
+    ctx.lineTo(target.x, target.y);
+    ctx.stroke();
+    // Small pulse at drone
+    ctx.globalAlpha = 0.25;
+    ctx.fillStyle = '#aaffff';
+    ctx.shadowColor = '#66ddff';
+    ctx.shadowBlur = 14;
+    ctx.beginPath();
+    ctx.arc(e.x, e.y, e.size * 0.35, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+}
       ctx.fillStyle = e.color;
       ctx.shadowColor = e.color;
-      ctx.shadowBlur = (typeof e.shadowBlurOverride === 'number') ? e.shadowBlurOverride : (e.isBoss ? 25 : (e.isElite ? 18 : 10));
+      ctx.shadowBlur = e.isBoss ? 25 : (e.isElite ? 18 : 10);
       
       // Optional sprite rendering (sniper). Falls back to default shape.
       if (e.spritePath) {

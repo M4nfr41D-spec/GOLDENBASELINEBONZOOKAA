@@ -347,7 +347,22 @@ export const MapGenerator = {
       if (rng.range(0, 1) > packChance) continue;
 
       const tpl = pickTemplate();
-      const size = rng.int(minSize, maxSize);
+
+      // If template defines explicit members, build exact composition.
+      let memberTypes = null;
+      if (tpl && Array.isArray(tpl.members) && tpl.members.length > 0) {
+        memberTypes = [];
+        for (const mm of tpl.members) {
+          const mi = (typeof mm.min === 'number') ? mm.min : 1;
+          const ma = (typeof mm.max === 'number') ? mm.max : mi;
+          const cnt = rng.int(mi, ma);
+          for (let c = 0; c < cnt; c++) memberTypes.push(mm.type);
+        }
+        // Ensure minimal size
+        if (memberTypes.length < 1) memberTypes = null;
+      }
+
+      const size = memberTypes ? memberTypes.length : rng.int(minSize, maxSize);
 
       // consume 'size' spawns from budget (anchor + size-1 additional)
       used.add(i);
@@ -366,9 +381,11 @@ export const MapGenerator = {
         const px = anchor.x + Math.cos(angle) * dist;
         const py = anchor.y + Math.sin(angle) * dist;
 
-        // Template can force types; otherwise use pool
+        // Template can force composition via members, or allow random types via tpl.types; otherwise use pool
         let type = null;
-        if (tpl && Array.isArray(tpl.types) && tpl.types.length > 0) {
+        if (memberTypes && memberTypes.length === size) {
+          type = memberTypes[m];
+        } else if (tpl && Array.isArray(tpl.types) && tpl.types.length > 0) {
           type = rng.pick(tpl.types);
         }
         if (!type) type = rng.pick(pool);

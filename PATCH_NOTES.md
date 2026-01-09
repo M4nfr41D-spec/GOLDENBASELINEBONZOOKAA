@@ -139,3 +139,10 @@ Default Caps (anpassbar in `Invariants.caps`):
 - Zone startet ohne Errors.
 - Sichtbar: Gruppen erscheinen als Cluster (3–5 Gegner nahe beieinander) neben Singles.
 - Gesamtzahl der Gegner bleibt innerhalb der bestehenden Caps.
+
+
+## Patch 9A4
+- Added synergy pack template: `pack_repair_escort` (1x breacher + 2x repair_drone, pack size 3)
+- Added new basic enemy type: `repair_drone` with capped tether heal (non-stacking per target per frame)
+- MapGenerator pack director now supports `template.members` explicit composition
+- Enemies: repair tether line visualization

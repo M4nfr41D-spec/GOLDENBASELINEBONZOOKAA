@@ -103,5 +103,41 @@
     ],
     "minNearSpawn": 6,
     "nearSpawnRadius": 1400
+  },
+  "background": {
+    "enabled": true,
+    "tileScale": 1.0,
+    "tileByAct": {
+      "act1": "./assets/backgrounds/tile_city_ruins.webp",
+      "act2": "./assets/backgrounds/tile_toxicity.webp",
+      "act3": "./assets/backgrounds/tile_void.webp"
+    },
+    "deco": {
+      "enabled": true,
+      "count": 6,
+      "scrollSpeed": 0.55,
+      "spritePaths": [
+        "./assets/asteroids_deco/asteroid_deco_1.png",
+        "./assets/asteroids_deco/asteroid_deco_2.png",
+        "./assets/asteroids_deco/asteroid_deco_3.png",
+        "./assets/asteroids_deco/asteroid_deco_4.png",
+        "./assets/asteroids_deco/asteroid_deco_big.png"
+      ],
+      "alphaMin": 0.25,
+      "alphaMax": 0.65,
+      "scaleMin": 0.35,
+      "scaleMax": 1.1
+    },
+    "fog": {
+      "enabled": true,
+      "count": 1,
+      "scrollSpeed": 0.12,
+      "driftSpeed": 32,
+      "paths": [
+        "./assets/fog/fog_1.png",
+        "./assets/fog/fog_5.png",
+        "./assets/fog/fog_14.png"
+      ]
+    }
   }
 }

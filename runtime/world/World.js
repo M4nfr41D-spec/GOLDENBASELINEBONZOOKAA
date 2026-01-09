@@ -13,6 +13,7 @@ import { MapGenerator } from './MapGenerator.js';
 import { Camera } from './Camera.js';
 import { SeededRandom } from './SeededRandom.js';
 import { DepthRules } from './DepthRules.js';
+import { Background } from './Background.js';
 
 export const World = {
   currentZone: null,
@@ -226,6 +227,9 @@ export const World = {
     // Select a bounded set of destructible asteroid props (seeded)
     // to keep performance stable and make them gameplay-relevant.
     this._prepareAsteroidsForZone(zoneSeed);
+
+    // Prepare deterministic background layers for this zone (tile + fog + deco).
+    Background.prepareZone(this.currentZone, zoneSeed, this.currentAct);
 
     this.zoneIndex = index;
     this.activeEnemies = [];
@@ -798,6 +802,12 @@ export const World = {
   
   // Draw parallax background layers
   drawParallax(ctx, screenW, screenH) {
+    if (!this.currentZone) return;
+
+    // New background stack (tile + fog + deco). If enabled and prepared, we skip legacy.
+    if (Background.draw(ctx, screenW, screenH, this.currentZone)) return;
+
+    // Legacy parallax fallback.
     if (!this.currentZone?.parallax) return;
     
     const parallax = this.currentZone.parallax;
