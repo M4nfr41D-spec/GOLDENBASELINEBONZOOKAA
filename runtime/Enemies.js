@@ -243,8 +243,8 @@ State.enemies.push(enemy);
   },
 
   // Exploration AI: patrol at spawn point, aggro in range, return when player leaves
-  updateExplorationAI\(e, dt, zone\) \{
-    const p = State\.player;
+  updateExplorationAI(e, dt, zone) {
+    const p = State.player;
 
     // Repair drone overrides base AI
     if (e.abilities && e.abilities.includes('repairTether')) {
