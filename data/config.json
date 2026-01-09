@@ -117,11 +117,9 @@
       "count": 6,
       "scrollSpeed": 0.55,
       "spritePaths": [
-        "./assets/asteroids_deco/asteroid_deco_1.png",
-        "./assets/asteroids_deco/asteroid_deco_2.png",
-        "./assets/asteroids_deco/asteroid_deco_3.png",
-        "./assets/asteroids_deco/asteroid_deco_4.png",
-        "./assets/asteroids_deco/asteroid_deco_big.png"
+        "./assets/asteroids_deco/deco_rock.png",
+        "./assets/asteroids_deco/deco_asteroid_cluster.png",
+        "./assets/asteroids_deco/deco_wreck_bike.png"
       ],
       "alphaMin": 0.25,
       "alphaMax": 0.65,
