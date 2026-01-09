@@ -8,8 +8,8 @@
     "baseFireRate": 3.5,
     "baseCritChance": 5,
     "baseCritDamage": 150,
-    "basePickupRadius": 260,
-    "bulletSpeed": 2800,
+    "basePickupRadius": 60,
+    "bulletSpeed": 800,
     "acceleration": 3000,
     "friction": 0.65,
     "deadzone": 0.1,
@@ -48,17 +48,17 @@
     "eliteDropChance": 0.3
   },
   "stash": {
-    "baseSlots": 180,
+    "baseSlots": 56,
     "maxSlots": 200
   },
   "effects": {
     "damageNumbers": {
-      "baseSize": 23,
-      "critSize": 36,
+      "baseSize": 16,
+      "critSize": 28,
       "normalColor": "#ffffff",
       "critColor": "#ffcc00",
       "bigHitColor": "#ff6600",
-      "floatSpeed": 150,
+      "floatSpeed": 120,
       "duration": 0.9,
       "spread": 30
     },
@@ -72,10 +72,10 @@
   "exploration": {
     "bossEveryNZones": 10,
     "mapScale": 5.0,
-    "enemyDensityMult": 0.75,
+    "enemyDensityMult": 0.35,
     "eliteDensityMult": 0.5,
-    "maxEnemySpawnsPerZone": 290,
-    "maxEliteSpawnsPerZone": 60,
+    "maxEnemySpawnsPerZone": 90,
+    "maxEliteSpawnsPerZone": 6,
     "enemySpawnMinDistBetween": 190,
     "enemySpawnMinDistFromSpawn": 360,
     "enemySpawnMinDistFromExit": 240,
@@ -114,12 +114,14 @@
     },
     "deco": {
       "enabled": true,
-      "count": 18,
+      "count": 6,
       "scrollSpeed": 0.55,
       "spritePaths": [
-        "./assets/asteroids_deco/deco_rock.png",
-        "./assets/asteroids_deco/deco_asteroid_cluster.png",
-        "./assets/asteroids_deco/deco_wreck_bike.png"
+        "./assets/asteroids_deco/asteroid_deco_1.png",
+        "./assets/asteroids_deco/asteroid_deco_2.png",
+        "./assets/asteroids_deco/asteroid_deco_3.png",
+        "./assets/asteroids_deco/asteroid_deco_4.png",
+        "./assets/asteroids_deco/asteroid_deco_big.png"
       ],
       "alphaMin": 0.25,
       "alphaMax": 0.65,
