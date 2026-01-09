@@ -8,8 +8,8 @@
     "baseFireRate": 3.5,
     "baseCritChance": 5,
     "baseCritDamage": 150,
-    "basePickupRadius": 60,
-    "bulletSpeed": 800,
+    "basePickupRadius": 260,
+    "bulletSpeed": 2800,
     "acceleration": 3000,
     "friction": 0.65,
     "deadzone": 0.1,
@@ -53,12 +53,12 @@
   },
   "effects": {
     "damageNumbers": {
-      "baseSize": 16,
-      "critSize": 28,
+      "baseSize": 23,
+      "critSize": 36,
       "normalColor": "#ffffff",
       "critColor": "#ffcc00",
       "bigHitColor": "#ff6600",
-      "floatSpeed": 120,
+      "floatSpeed": 150,
       "duration": 0.9,
       "spread": 30
     },
