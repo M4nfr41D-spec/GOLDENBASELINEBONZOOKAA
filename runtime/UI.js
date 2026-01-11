@@ -13,6 +13,8 @@ import { Save } from './Save.js';
 
 export const UI = {
   tooltipEl: null,
+  // Persist opened skill tree sections across rerenders (prevents accordion reset)
+  openTrees: new Set(),
   
   init() {
     this.tooltipEl = document.getElementById('tooltip');
@@ -189,7 +191,7 @@ export const UI = {
       const totalInTree = Object.values(learned[treeId] || {}).reduce((a, b) => a + b, 0);
       
       html += `
-        <div class="skill-tree-section" id="tree-${treeId}">
+        <div class="skill-tree-section ${this.openTrees.has(treeId) ? 'open' : ''}" id="tree-${treeId}">
           <div class="skill-tree-header" style="--tree-color: ${tree.color}" onclick="UI.toggleTree('${treeId}')">
             <span class="tree-icon">${tree.icon}</span>
             <span class="tree-name">${tree.name}</span>
@@ -224,7 +226,10 @@ export const UI = {
   
   toggleTree(treeId) {
     const section = document.getElementById(`tree-${treeId}`);
+    // Update DOM + persisted state so the tree stays open after rerenders.
     if (section) section.classList.toggle('open');
+    if (this.openTrees.has(treeId)) this.openTrees.delete(treeId);
+    else this.openTrees.add(treeId);
   },
   
   // ========== VENDOR ==========

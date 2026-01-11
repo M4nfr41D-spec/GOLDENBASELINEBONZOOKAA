@@ -21,6 +21,7 @@ import { Input } from './runtime/Input.js';
 import { UI } from './runtime/UI.js';
 import { Contracts } from './runtime/Contracts.js';
 import { Invariants } from './runtime/Invariants.js';
+import { PauseUI } from './runtime/PauseUI.js';
 
 // World System
 import { Camera } from './runtime/world/Camera.js';
@@ -78,8 +79,23 @@ const Game = {
     // Initialize systems
     Input.init(this.canvas);
     UI.init();
+    // Ensure pause UI reflects current state
+    PauseUI.apply();
     Camera.init(0, 0);
     SceneManager.init();
+
+    // In-run overlay toggle (Inventory/Skills) - keep combat viewport clean
+    window.addEventListener('keydown', (e) => {
+      // Toggle only during combat scene; hub/start/death modals have their own UX
+      const scene = SceneManager.getScene();
+      if (scene !== 'combat') return;
+
+      // I, Tab, or Escape toggles pause overlay
+      if (e.code === 'KeyI' || e.code === 'Tab' || e.code === 'Escape') {
+        e.preventDefault();
+        PauseUI.toggle();
+      }
+    }, { passive: false });
     
     // Calculate stats
     Stats.calculate();
