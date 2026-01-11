@@ -21,7 +21,6 @@ import { Input } from './runtime/Input.js';
 import { UI } from './runtime/UI.js';
 import { Contracts } from './runtime/Contracts.js';
 import { Invariants } from './runtime/Invariants.js';
-import { PauseUI } from './runtime/PauseUI.js';
 
 // World System
 import { Camera } from './runtime/world/Camera.js';
@@ -79,23 +78,8 @@ const Game = {
     // Initialize systems
     Input.init(this.canvas);
     UI.init();
-    // Ensure pause UI reflects current state
-    PauseUI.apply();
     Camera.init(0, 0);
     SceneManager.init();
-
-    // In-run overlay toggle (Inventory/Skills) - keep combat viewport clean
-    window.addEventListener('keydown', (e) => {
-      // Toggle only during combat scene; hub/start/death modals have their own UX
-      const scene = SceneManager.getScene();
-      if (scene !== 'combat') return;
-
-      // I, Tab, or Escape toggles pause overlay
-      if (e.code === 'KeyI' || e.code === 'Tab' || e.code === 'Escape') {
-        e.preventDefault();
-        PauseUI.toggle();
-      }
-    }, { passive: false });
     
     // Calculate stats
     Stats.calculate();
@@ -164,7 +148,11 @@ const Game = {
   
   loop(time) {
     try {
-      const dt = Math.min((time - this.lastTime) / 1000, 0.05);
+      // Handle first frame / timer discontinuities (tab switch, iOS, etc.)
+      const prev = Number.isFinite(this.lastTime) ? this.lastTime : time;
+      let dt = (time - prev) / 1000;
+      if (!Number.isFinite(dt) || dt < 0) dt = 0;
+      dt = Math.min(dt, 0.05);
       this.lastTime = time;
 
       // Runtime guardrails (NaN/Infinity + caps)
