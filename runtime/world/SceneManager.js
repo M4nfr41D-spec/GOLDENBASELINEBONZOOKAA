@@ -34,6 +34,10 @@ export const SceneManager = {
       this.currentScene = 'hub';
       State.scene = 'hub';
       State.run.inCombat = false;
+
+      // Always return to a known UI state.
+      State.ui.paused = false;
+      document.body.classList.remove('paused-ui');
       
       // Save progress
       State.modules.Save?.save();
@@ -55,6 +59,12 @@ export const SceneManager = {
         State.scene = 'combat';
         State.run.inCombat = true;
         State.run.currentAct = actId;
+
+        // Defensive: make sure pause state is OFF when entering combat.
+        // If paused-ui remains active, the HUD grid can collapse and the
+        // canvas ends up constrained to the left column.
+        State.ui.paused = false;
+        document.body.classList.remove('paused-ui');
 
         // Reset run stats
         State.run.wave = 1;
