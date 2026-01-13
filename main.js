@@ -19,8 +19,6 @@ import { Pickups } from './runtime/Pickups.js';
 import { Particles } from './runtime/Particles.js';
 import { Input } from './runtime/Input.js';
 import { UI } from './runtime/UI.js';
-import { Contracts } from './runtime/Contracts.js';
-import { Invariants } from './runtime/Invariants.js';
 
 // World System
 import { Camera } from './runtime/world/Camera.js';
@@ -48,16 +46,19 @@ const Game = {
   
   async init() {
     console.log('🚀 BONZOOKAA Exploration Mode initializing...');
-
-    // Fail fast on BOOT contracts only.
-    // Feature-specific UI contracts are asserted lazily when their flows are invoked.
-    Contracts.assertBoot();
     
     // Setup canvas
     this.canvas = document.getElementById('gameCanvas');
     this.ctx = this.canvas.getContext('2d');
     this.resize();
-    window.addEventListener('resize', () => this.resize());
+    window.addEventListener('resize', () => this.resize(true));
+
+    // HOTFIX: observe container size changes (UI overlays / grid reflow) and keep canvas in sync.
+    const container = document.getElementById('gameContainer');
+    if (window.ResizeObserver && container) {
+      this._containerRO = new ResizeObserver(() => this.resize(true));
+      this._containerRO.observe(container);
+    }
     
     // Load data
     await loadAllData();
@@ -71,9 +72,6 @@ const Game = {
       Enemies, Bullets, Pickups, Particles, UI,
       Camera, World, SceneManager
     };
-
-    // Allow world/systems to invoke high-level game flow (e.g., portal -> hub)
-    State.modules.Game = this;
     
     // Initialize systems
     Input.init(this.canvas);
@@ -102,12 +100,36 @@ const Game = {
     console.log('✅ Exploration mode ready');
   },
   
-  resize() {
+  resize(force = false) {
     const container = document.getElementById('gameContainer');
-    this.canvas.width = container.clientWidth;
-    this.canvas.height = container.clientHeight;
-    this.screenW = this.canvas.width;
-    this.screenH = this.canvas.height;
+    if (!container || !this.canvas) return;
+
+    // Use rect (more reliable with overlays / transforms)
+    const rect = container.getBoundingClientRect();
+    const w = Math.floor(rect.width);
+    const h = Math.floor(rect.height);
+
+    // Guard: during UI reflow the container can briefly collapse to the left column.
+    // In that case we retry on the next frame instead of "locking in" a tiny canvas.
+    if (!force && (w < 480 || h < 320)) {
+      if (!this._resizeRetryScheduled) {
+        this._resizeRetryScheduled = true;
+        requestAnimationFrame(() => {
+          this._resizeRetryScheduled = false;
+          this.resize(true);
+        });
+      }
+      return;
+    }
+
+    if (w <= 0 || h <= 0) return;
+
+    if (this.canvas.width !== w || this.canvas.height !== h) {
+      this.canvas.width = w;
+      this.canvas.height = h;
+      this.screenW = w;
+      this.screenH = h;
+    }
   },
   
   addStarterItems() {
@@ -148,15 +170,8 @@ const Game = {
   
   loop(time) {
     try {
-      // Handle first frame / timer discontinuities (tab switch, iOS, etc.)
-      const prev = Number.isFinite(this.lastTime) ? this.lastTime : time;
-      let dt = (time - prev) / 1000;
-      if (!Number.isFinite(dt) || dt < 0) dt = 0;
-      dt = Math.min(dt, 0.05);
+      const dt = Math.min((time - this.lastTime) / 1000, 0.05);
       this.lastTime = time;
-
-      // Runtime guardrails (NaN/Infinity + caps)
-      Invariants.preFrame(dt, { phase: 'loop', t: time });
       
       // Update scene transitions
       SceneManager.updateTransition(dt);
@@ -167,34 +182,12 @@ const Game = {
       if (scene === 'combat' && !State.ui.paused) {
         this.updateCombat(dt);
       }
-
-      // Clear edge-triggered inputs (one-shot actions)
-      if (State.input) {
-        State.input.interactPressed = false;
-      }
-      // Post-update invariants: caps + core sanity + sampled entity checks
-      Invariants.postFrame({ phase: 'postUpdate', act: State.world?.currentAct, zoneIndex: State.world?.zoneIndex });
       
       // Always render
       this.render(dt);
       
     } catch (error) {
       console.error('❌ Error in game loop:', error);
-      // Capture deterministic debug dump (console + localStorage)
-      Invariants.captureDump(error, {
-        phase: 'loopCatch',
-        t: time,
-        act: State.world?.currentAct,
-        zoneIndex: State.world?.zoneIndex,
-        inCombat: State.run?.inCombat,
-        counts: {
-          bullets: State.bullets?.length || 0,
-          enemyBullets: State.enemyBullets?.length || 0,
-          enemies: State.enemies?.length || 0,
-          pickups: State.pickups?.length || 0,
-          particles: State.particles?.length || 0
-        }
-      });
     }
     
     requestAnimationFrame((t) => this.loop(t));
@@ -211,15 +204,11 @@ const Game = {
     // Update camera to follow player
     Camera.update(dt, this.screenW, this.screenH);
     
-    // Update world (view-based prewarm spawning to avoid pop-in)
-    World.update(dt, this.screenW, this.screenH);
+    // Update world (proximity spawning)
+    World.update(dt);
     
     // Update player
     Player.update(dt, this.canvas, true); // true = exploration mode
-
-    // Obstacle/prop collisions (Asteroids, mines, etc.)
-    // Runs after player movement, before death check.
-    World.resolvePlayerObstacleCollisions(dt, this.screenW, this.screenH);
     
     // Check death
     if (Player.isDead()) {
@@ -269,8 +258,9 @@ const Game = {
   },
   
   renderCombat(ctx, dt) {
-    // Draw parallax background (world coords)
-    World.drawParallax(ctx, this.screenW, this.screenH);
+    // Draw parallax background (screen-space)
+    (World.drawParallaxBackground ? World.drawParallaxBackground(ctx, this.screenW, this.screenH)
+      : World.drawParallax(ctx, this.screenW, this.screenH));
     
     // Apply camera transform for world objects
     ctx.save();
@@ -294,6 +284,9 @@ const Game = {
     // Draw particles
     Particles.draw(ctx);
     ctx.restore();
+
+    // Parallax foreground (screen-space; above world, below UI)
+    if (World.drawParallaxForeground) World.drawParallaxForeground(ctx, this.screenW, this.screenH);
     
     // Draw screen-space UI (minimap, etc)
     this.drawMinimap(ctx);
@@ -408,8 +401,6 @@ const Game = {
   // ========== HUB ==========
   
   showHub() {
-    // Hub UI is optional at boot, but required if we enter the hub flow.
-    Contracts.assertHubUI();
     SceneManager.goToHub();
     this.hideModal('startModal');
     this.showModal('hubModal');
@@ -464,9 +455,6 @@ const Game = {
   
   startAct(actId) {
     console.log(`🎮 Starting ${actId}...`);
-
-    // Combat HUD is required once we enter combat (updateHUD writes without null-checks).
-    Contracts.assertCombatHUD();
     
     // Generate seed (can be customized)
     const seed = SeededRandom.fromString(actId + '_' + Date.now());
@@ -530,7 +518,6 @@ const Game = {
   },
   
   onDeath() {
-    Contracts.assertDeathUI();
     State.run.active = false;
     
     // Add earnings (partial)
@@ -565,7 +552,6 @@ const Game = {
   // ========== VENDOR ==========
   
   openVendor() {
-    Contracts.assertVendorUI();
     State.ui.paused = true;
     UI.renderVendor();
     this.showModal('vendorModal');
