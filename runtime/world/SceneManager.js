@@ -10,11 +10,6 @@ import { State } from '../State.js';
 import { World } from './World.js';
 import { Camera } from './Camera.js';
 
-const forceLayoutResize = () => {
-  // double-rAF ensures layout has settled (grid/overlay changes)
-  requestAnimationFrame(() => requestAnimationFrame(() => window.dispatchEvent(new Event('resize'))));
-};
-
 export const SceneManager = {
   currentScene: 'hub', // 'hub', 'combat', 'loading', 'gameover'
   
@@ -39,15 +34,10 @@ export const SceneManager = {
       this.currentScene = 'hub';
       State.scene = 'hub';
       State.run.inCombat = false;
-      
-      
 
-      // HOTFIX: always return to known UI state
+      // Always return to a known UI state.
       State.ui.paused = false;
       document.body.classList.remove('paused-ui');
-      forceLayoutResize();
-// Show hub UI
-      this.showHubUI();
       
       // Save progress
       State.modules.Save?.save();
@@ -70,14 +60,11 @@ export const SceneManager = {
         State.run.inCombat = true;
         State.run.currentAct = actId;
 
-        
-
-        // HOTFIX: entering combat must not keep paused overlay active
+        // Defensive: make sure pause state is OFF when entering combat.
+        // If paused-ui remains active, the HUD grid can collapse and the
+        // canvas ends up constrained to the left column.
         State.ui.paused = false;
         document.body.classList.remove('paused-ui');
-        forceLayoutResize();
-// Hide hub UI, show game UI
-        this.showCombatUI();
 
         // Reset run stats
         State.run.wave = 1;
@@ -102,7 +89,6 @@ export const SceneManager = {
         State.scene = 'hub';
         State.run.inCombat = false;
 
-        this.showHubUI();
         State.modules.Save?.save();
       }
     });
@@ -196,32 +182,7 @@ export const SceneManager = {
         break;
     }
   },
-  
-  // Show hub UI elements
-  showHubUI() {
-    // Hide game canvas elements
-    const gameUI = document.getElementById('gameUI');
-    if (gameUI) gameUI.style.display = 'none';
-    
-    // Show hub UI
-    const hubUI = document.getElementById('hubUI');
-    if (hubUI) hubUI.style.display = 'flex';
-    
-    // Update hub displays
-    State.modules.UI?.renderHub?.();
-  },
-  
-  // Show combat UI elements
-  showCombatUI() {
-    // Show game UI
-    const gameUI = document.getElementById('gameUI');
-    if (gameUI) gameUI.style.display = 'block';
-    
-    // Hide hub UI
-    const hubUI = document.getElementById('hubUI');
-    if (hubUI) hubUI.style.display = 'none';
-  },
-  
+
   // Show death screen
   showDeathScreen() {
     this.currentScene = 'gameover';

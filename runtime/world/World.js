@@ -7,21 +7,160 @@
 // Manages current zone, spawns enemies when player approaches
 
 import { State } from '../State.js';
+import { Player } from '../Player.js';
+import { Particles } from '../Particles.js';
 import { MapGenerator } from './MapGenerator.js';
 import { Camera } from './Camera.js';
 import { SeededRandom } from './SeededRandom.js';
 import { DepthRules } from './DepthRules.js';
+import { Background } from './Background.js';
 
 export const World = {
   currentZone: null,
   currentAct: null,
   zoneIndex: 0,
+
+  // Cached asteroid sprites (optional)
+  _asteroidSpritesLoaded: false,
+  _asteroidSprites: [],
   
   // Spawning config
-  spawnRadius: 600,      // Distance to trigger spawn
-  despawnRadius: 1200,   // Distance to despawn (performance)
+  // Legacy distance-based spawning (kept as fallback)
+  spawnRadius: 600,
+  despawnRadius: 1200,
+
+  // View-based spawning (preferred): spawns become active before they enter the camera view
+  spawnViewMargin: 520,      // pixels beyond viewport to prewarm spawns
+  despawnViewMargin: 1800,   // pixels beyond viewport to allow despawn
   activeEnemies: [],     // Currently active enemies from spawns
-  
+
+  // Check if a world point is within (camera view + margin)
+  isInView(x, y, camX, camY, screenW, screenH, margin) {
+    return (
+      x >= camX - margin &&
+      x <= camX + screenW + margin &&
+      y >= camY - margin &&
+      y <= camY + screenH + margin
+    );
+  },
+
+  // Lazy-load optional asteroid sprites (safe fallback to vector draw)
+  _ensureAsteroidSpritesLoaded() {
+    if (this._asteroidSpritesLoaded) return;
+    this._asteroidSpritesLoaded = true;
+
+    const cfg = State.data.config?.asteroids || {};
+    const paths = Array.isArray(cfg.spritePaths) && cfg.spritePaths.length
+      ? cfg.spritePaths
+      : [
+          './assets/asteroids/asteroid_1.png',
+          './assets/asteroids/asteroid_2.png'
+        ];
+
+    this._asteroidSprites = paths.map((src) => {
+      const img = new Image();
+      img.src = src;
+      return img;
+    });
+  },
+
+  // Reduce generated asteroid obstacles down to a bounded, gameplay-relevant set.
+  // Keeps performance stable regardless of zone size/density.
+  // Also guarantees a small cluster near spawn so you SEE them immediately.
+  _prepareAsteroidsForZone(zoneSeed) {
+    if (!this.currentZone) return;
+
+    const cfg = State.data.config?.asteroids || {};
+    const enabled = cfg.enabled !== false;
+    if (!enabled) {
+      this.currentZone.asteroids = [];
+      return;
+    }
+
+    const maxPerZone = (typeof cfg.maxPerZone === 'number') ? cfg.maxPerZone : 30;
+    const minNearSpawn = (typeof cfg.minNearSpawn === 'number') ? cfg.minNearSpawn : Math.min(6, maxPerZone);
+    const nearSpawnRadius = (typeof cfg.nearSpawnRadius === 'number') ? cfg.nearSpawnRadius : 1400;
+
+    const zone = this.currentZone;
+    const spawn = zone.spawn || { x: zone.width / 2, y: zone.height / 2 };
+
+    const candidates = [];
+    const remaining = [];
+
+    for (const obs of zone.obstacles || []) {
+      // Be tolerant: consider any 'asteroid' obstacle unless explicitly non-destructible.
+      if (obs?.type === 'asteroid' && obs.destructible !== false) candidates.push(obs);
+      else remaining.push(obs);
+    }
+
+    // Deterministic RNG for selection & clustering
+    const rng = new SeededRandom((zoneSeed ^ 0xA57E01D) >>> 0);
+    const shuffle = (arr) => {
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = rng.int(0, i);
+        const t = arr[i];
+        arr[i] = arr[j];
+        arr[j] = t;
+      }
+    };
+
+    const near = [];
+    const far = [];
+    for (const c of candidates) {
+      const d = Math.hypot((c.x || 0) - spawn.x, (c.y || 0) - spawn.y);
+      (d <= nearSpawnRadius ? near : far).push(c);
+    }
+
+    shuffle(near);
+    shuffle(far);
+
+    const picked = [];
+    const takeNear = Math.min(Math.max(0, minNearSpawn), maxPerZone, near.length);
+    if (takeNear > 0) picked.push(...near.slice(0, takeNear));
+
+    const restPool = near.slice(takeNear).concat(far);
+    shuffle(restPool);
+
+    const remainingSlots = Math.max(0, maxPerZone - picked.length);
+    if (remainingSlots > 0) picked.push(...restPool.slice(0, remainingSlots));
+
+    // If no candidates exist (e.g. obstacleDensity==0), synthesize a small deterministic cluster.
+    if (picked.length === 0 && maxPerZone > 0) {
+      const synthCount = Math.min(maxPerZone, Math.max(4, minNearSpawn || 0));
+      for (let i = 0; i < synthCount; i++) {
+        const ang = rng.range(0, Math.PI * 2);
+        const dist = rng.range(420, Math.max(520, nearSpawnRadius));
+        const x = Math.max(120, Math.min(zone.width - 120, spawn.x + Math.cos(ang) * dist));
+        const y = Math.max(120, Math.min(zone.height - 120, spawn.y + Math.sin(ang) * dist));
+        picked.push({
+          x, y,
+          type: 'asteroid',
+          radius: rng.int(34, 74),
+          rotation: rng.range(0, Math.PI * 2),
+          destructible: true,
+          hp: rng.int(25, 60),
+          damage: 0
+        });
+      }
+    }
+
+    // Remove ALL asteroid obstacles from the generic obstacle list (perf) and keep only our bounded props.
+    zone.obstacles = remaining;
+
+    // Sprite selection uses configured paths count (safe even if images fail to load).
+    const spriteCount = (Array.isArray(cfg.spritePaths) && cfg.spritePaths.length) ? cfg.spritePaths.length : 2;
+
+    zone.asteroids = picked.map(a => {
+      a.destroyed = false;
+      a._hitCd = 0;
+      a._spriteIdx = spriteCount > 0 ? rng.int(0, spriteCount - 1) : 0;
+      return a;
+    });
+
+    // Asset load is optional; keeps run-time safe even when the files are missing.
+    this._ensureAsteroidSpritesLoaded();
+  },
+
   // Initialize world with act config
   async init(actId, seed = null) {
     // Load act config
@@ -47,6 +186,13 @@ export const World = {
   
   // Load/generate a zone (endless via depth)
   loadZone(index) {
+    // Zone transition cleanup: prevent entity/bullet carry-over
+    State.bullets = [];
+    State.enemyBullets = [];
+    State.enemies = [];
+    State.pickups = [];
+    State.particles = [];
+
     // Depth is 1-based
     const depth = index + 1;
     const zoneSeed = MapGenerator.createZoneSeed(this.currentAct.seed, index);
@@ -55,10 +201,15 @@ export const World = {
     DepthRules.maybeUnlock(depth, this.currentAct);
     DepthRules.recordDepth(depth);
 
-    // Boss interval: default to act.zones (number) or 4
-    const bossInterval = (typeof this.currentAct.zones === 'number' && this.currentAct.zones > 0)
+    // Boss interval: prefer config (exploration.bossEveryNZones), else act.zones, else 10
+    const tune = State.data.config?.exploration || {};
+    const cfgBossEvery = (typeof tune.bossEveryNZones === 'number' && tune.bossEveryNZones > 0)
+      ? tune.bossEveryNZones
+      : null;
+    const actBossEvery = (typeof this.currentAct.zones === 'number' && this.currentAct.zones > 0)
       ? this.currentAct.zones
-      : 4;
+      : null;
+    const bossInterval = cfgBossEvery || actBossEvery || 10;
     const isBossZone = (depth % bossInterval) === 0;
 
     // Sample active modifiers for this zone
@@ -72,6 +223,13 @@ export const World = {
 
     this.currentZone.depth = depth;
     this.currentZone.mods = activeMods;
+
+    // Select a bounded set of destructible asteroid props (seeded)
+    // to keep performance stable and make them gameplay-relevant.
+    this._prepareAsteroidsForZone(zoneSeed);
+
+    // Prepare deterministic background layers for this zone (tile + fog + deco).
+    Background.prepareZone(this.currentZone, zoneSeed, this.currentAct);
 
     this.zoneIndex = index;
     this.activeEnemies = [];
@@ -99,25 +257,40 @@ export const World = {
     this.bossSpawned = false;
   },
   
-  // Update - handle proximity spawning
-  update(dt) {
+  // Update - handle view-based spawning (and fallback proximity spawning)
+  update(dt, screenW = 800, screenH = 600) {
     if (!this.currentZone) return;
-    
+
     const player = State.player;
+    const tune = State.data.config?.exploration || {};
+    const spawnMargin = (typeof tune.spawnViewMargin === 'number') ? tune.spawnViewMargin : this.spawnViewMargin;
+    const despawnMargin = (typeof tune.despawnViewMargin === 'number') ? tune.despawnViewMargin : this.despawnViewMargin;
+    const portalRadius = (typeof tune.portalInteractRadius === 'number') ? tune.portalInteractRadius : 75;
+
+    // Use camera target (less laggy) for spawn checks.
+    const camX = (Camera.targetX != null) ? Camera.targetX : Camera.getX();
+    const camY = (Camera.targetY != null) ? Camera.targetY : Camera.getY();
     
     // Check enemy spawns
     for (const spawn of this.currentZone.enemySpawns) {
       if (spawn.killed) continue;
       
       const dist = Math.hypot(player.x - spawn.x, player.y - spawn.y);
-      
-      // Spawn if player close
-      if (!spawn.active && dist < this.spawnRadius) {
+
+      // Preferred: spawn when the spawn point approaches the camera view.
+      // This prevents "enemies popping into existence" right next to the ship.
+      const shouldSpawnByView = this.isInView(spawn.x, spawn.y, camX, camY, screenW, screenH, spawnMargin);
+      if (!spawn.active && shouldSpawnByView) {
+        this.spawnEnemy(spawn, false);
+      } else if (!spawn.active && dist < this.spawnRadius) {
+        // Fallback for edge cases (very small screens / extreme camera settings)
         this.spawnEnemy(spawn, false);
       }
       
       // Despawn if too far (and not engaged)
-      if (spawn.active && dist > this.despawnRadius) {
+      // Despawn when far outside view (and the enemy has returned home)
+      const shouldDespawnByView = !this.isInView(spawn.x, spawn.y, camX, camY, screenW, screenH, despawnMargin);
+      if (spawn.active && (shouldDespawnByView || dist > this.despawnRadius)) {
         // Only despawn when the enemy is effectively "idle" at home.
         // If it was engaged, force a return so it doesn't vanish mid-behavior.
         const enemy = State.enemies.find(e => e.id === spawn.enemyId);
@@ -140,9 +313,28 @@ export const World = {
       if (spawn.killed) continue;
       
       const dist = Math.hypot(player.x - spawn.x, player.y - spawn.y);
-      
-      if (!spawn.active && dist < this.spawnRadius) {
+
+      const shouldSpawnByView = this.isInView(spawn.x, spawn.y, camX, camY, screenW, screenH, spawnMargin);
+      if (!spawn.active && shouldSpawnByView) {
         this.spawnEnemy(spawn, true);
+      } else if (!spawn.active && dist < this.spawnRadius) {
+        this.spawnEnemy(spawn, true);
+      }
+
+      // Despawn elites when far outside view (only once they returned home)
+      const shouldDespawnByView = !this.isInView(spawn.x, spawn.y, camX, camY, screenW, screenH, despawnMargin);
+      if (spawn.active && (shouldDespawnByView || dist > this.despawnRadius)) {
+        const enemy = State.enemies.find(e => e.id === spawn.enemyId);
+        if (enemy) {
+          if (enemy.aiState === 'aggro') enemy.aiState = 'return';
+          const distHome = Math.hypot(enemy.x - spawn.x, enemy.y - spawn.y);
+          const homeThreshold = enemy.returnThreshold || 60;
+          if (enemy.aiState !== 'aggro' && distHome <= homeThreshold) {
+            this.despawnEnemy(spawn);
+          }
+        } else {
+          this.despawnEnemy(spawn);
+        }
       }
     }
     
@@ -150,8 +342,12 @@ export const World = {
     if (this.currentZone.bossSpawn && !this.currentZone.bossSpawn.killed) {
       const spawn = this.currentZone.bossSpawn;
       const dist = Math.hypot(player.x - spawn.x, player.y - spawn.y);
-      
-      if (!spawn.active && dist < this.spawnRadius * 1.5) {
+
+      const bossMargin = spawnMargin * 1.25;
+      const shouldSpawnByView = this.isInView(spawn.x, spawn.y, camX, camY, screenW, screenH, bossMargin);
+      if (!spawn.active && shouldSpawnByView) {
+        this.spawnBoss(spawn);
+      } else if (!spawn.active && dist < this.spawnRadius * 1.5) {
         this.spawnBoss(spawn);
       }
     }
@@ -166,20 +362,82 @@ export const World = {
       }
     }
     
-    // Check portal collision
+    // Portal interaction (no auto-teleport): require player input
+    this.nearPortal = null;
     for (const portal of this.currentZone.portals) {
       const dist = Math.hypot(player.x - portal.x, player.y - portal.y);
-      if (dist < 60) {
-        this.onPortalEnter(portal);
+      if (dist < portalRadius) {
+        this.nearPortal = portal;
+        break;
       }
+    }
+
+    if (this.nearPortal && State.input?.interactPressed) {
+      this.usePortal(this.nearPortal);
     }
     
     // Enemy AI (patrol/aggro/return) is handled in Enemies.update() for exploration mode.
+  },
+
+  // Player vs Asteroid collision (block + damage). Kept deterministic and bounded.
+  // Called from main.js after Player.update() so we collide with the new position.
+  resolvePlayerObstacleCollisions(dt, screenW = 800, screenH = 600) {
+    const zone = this.currentZone;
+    if (!zone) return;
+    const asteroids = zone.asteroids || [];
+    if (!asteroids.length) return;
+
+    const cfg = State.data.config?.asteroids || {};
+    const damagePct = (typeof cfg.playerCollisionDamagePct === 'number') ? cfg.playerCollisionDamagePct : 0.05;
+    const hitCooldown = (typeof cfg.playerCollisionCooldown === 'number') ? cfg.playerCollisionCooldown : 0.75;
+    const knockback = (typeof cfg.knockbackStrength === 'number') ? cfg.knockbackStrength : 280;
+
+    const p = State.player;
+    const pR = p.radius || 18;
+
+    for (const a of asteroids) {
+      if (!a || a.destroyed) continue;
+      if (a._hitCd > 0) a._hitCd = Math.max(0, a._hitCd - dt);
+
+      const dx = p.x - a.x;
+      const dy = p.y - a.y;
+      const dist = Math.hypot(dx, dy);
+      const minDist = pR + (a.radius || 50);
+
+      if (dist < minDist) {
+        // Resolve overlap
+        const safeDist = dist > 0.001 ? dist : 0.001;
+        const nx = dx / safeDist;
+        const ny = dy / safeDist;
+        const overlap = minDist - safeDist;
+
+        p.x += nx * overlap;
+        p.y += ny * overlap;
+        p.vx += nx * knockback;
+        p.vy += ny * knockback;
+
+        // Apply damage with cooldown to prevent "frame-melt"
+        if (a._hitCd <= 0) {
+          const maxHP = (typeof p.maxHP === 'number') ? p.maxHP : 100;
+          const dmg = Math.max(1, maxHP * damagePct);
+          Player.takeDamage(dmg);
+          Particles.spawn(p.x, p.y, 'playerHit');
+          a._hitCd = hitCooldown;
+        }
+      }
+    }
+
+    // Clamp back into zone bounds after collision resolution
+    const margin = (pR || 18) + 5;
+    p.x = Math.max(margin, Math.min(zone.width - margin, p.x));
+    p.y = Math.max(margin, Math.min(zone.height - margin, p.y));
   },
   
   // Spawn regular enemy
   spawnEnemy(spawn, isElite = false) {
     const { Enemies } = State.modules;
+    const tune = State.data.config?.exploration || {};
+    const aggroMult = (typeof tune.enemyAggroRangeMult === 'number') ? tune.enemyAggroRangeMult : 1.0;
     
     // Calculate level based on player
     const playerLvl = State.meta.level || 1;
@@ -212,7 +470,8 @@ export const World = {
     enemy.wanderTimer = 0;
 
     // Engagement envelope (tuned for exploration)
-    enemy.aggroRange = spawn.aggroRange || (isElite ? 520 : 420);
+    const baseAggro = spawn.aggroRange || (isElite ? 420 : 340);
+    enemy.aggroRange = baseAggro * aggroMult;
     enemy.attackRange = spawn.attackRange || enemy.aggroRange;
     enemy.disengageRange = spawn.disengageRange || enemy.aggroRange * 1.65;
     enemy.leashRange = spawn.leashRange || Math.max(enemy.aggroRange * 2.2, patrolRadius * 5);
@@ -234,6 +493,8 @@ export const World = {
   // Spawn boss
   spawnBoss(spawn) {
     const { Enemies } = State.modules;
+    const tune = State.data.config?.exploration || {};
+    const aggroMult = (typeof tune.enemyAggroRangeMult === 'number') ? tune.enemyAggroRangeMult : 1.0;
     
     const playerLvl = State.meta.level || 1;
     const bossLvl = playerLvl + Math.floor(Math.random() * 6); // +0 to +5
@@ -252,7 +513,8 @@ export const World = {
     enemy.patrolDir = 1;
     enemy.patrolTimer = 0;
 
-    enemy.aggroRange = spawn.aggroRange || 750;
+    const baseAggro = spawn.aggroRange || 550;
+    enemy.aggroRange = baseAggro * aggroMult;
     enemy.attackRange = spawn.attackRange || enemy.aggroRange;
     enemy.disengageRange = spawn.disengageRange || enemy.aggroRange * 1.5;
     enemy.leashRange = spawn.leashRange || Math.max(enemy.aggroRange * 2.0, enemy.patrolRadius * 6);
@@ -301,13 +563,15 @@ export const World = {
   
   // Boss killed - spawn portal
   onBossKilled() {
-    State.ui?.showAnnouncement?.('✨ PORTAL OPENED!');
-    
-    // Spawn portal to hub
+    // Track run stats (best-effort)
+    if (State.run?.stats) State.run.stats.bossesKilled = (State.run.stats.bossesKilled || 0) + 1;
+
+    // Spawn portal to next zone (Shift+E can return to hub)
     this.currentZone.portals.push({
       x: this.currentZone.width / 2,
       y: this.currentZone.height / 2,
-      destination: 'hub',
+      destination: 'next',
+      allowHub: true,
       type: 'victory'
     });
   },
@@ -318,16 +582,40 @@ export const World = {
     this.loadZone(nextZone);
   },
   
-  // Player entered portal
-  onPortalEnter(portal) {
+  // Use portal (requires interact input)
+  usePortal(portal) {
+    const wantsHub = !!State.input?.shift;
+    const Game = State.modules?.Game;
+    const SceneManager = State.modules?.SceneManager;
+
+    if (wantsHub && portal.allowHub) {
+      // Prefer full game-flow (credits resources, saves, shows hub)
+      if (Game?.returnToHub) Game.returnToHub();
+      else if (SceneManager?.returnToHub) SceneManager.returnToHub('portal');
+      return;
+    }
+
+    if (portal.destination === 'next') {
+      const nextZone = this.zoneIndex + 1;
+      this.loadZone(nextZone);
+      return;
+    }
+
     if (portal.destination === 'hub') {
-      // Transition to hub
-      State.scene = 'hub';
-      State.ui?.renderHub?.();
-    } else if (portal.destination) {
-      // Load specific act/zone
+      if (Game?.returnToHub) Game.returnToHub();
+      else if (SceneManager?.returnToHub) SceneManager.returnToHub('portal');
+      return;
+    }
+
+    // Fallback: load act by id
+    if (portal.destination && typeof portal.destination === 'string') {
       this.init(portal.destination);
     }
+  },
+
+  // Backwards-compatible hook (if older code calls onPortalEnter)
+  onPortalEnter(portal) {
+    this.usePortal(portal);
   },
   
   // Update enemy patrol behavior
@@ -385,6 +673,36 @@ export const World = {
       ctx.fill();
     }
     ctx.globalAlpha = 1;
+
+    // Draw asteroid props (destructible, collidable)
+    if (this.currentZone.asteroids && this.currentZone.asteroids.length) {
+      this._ensureAsteroidSpritesLoaded();
+      for (const a of this.currentZone.asteroids) {
+        if (!a || a.destroyed) continue;
+        if (!Camera.isVisible(a.x, a.y, (a.radius || 60) + 100, screenW, screenH)) continue;
+
+        const r = a.radius || 60;
+        ctx.save();
+        ctx.translate(a.x, a.y);
+        ctx.rotate(a.rotation || 0);
+
+        const img = this._asteroidSprites?.length ? this._asteroidSprites[(a._spriteIdx || 0) % this._asteroidSprites.length] : null;
+        if (img && img.complete && img.naturalWidth > 0) {
+          const s = r * 2;
+          ctx.drawImage(img, -s / 2, -s / 2, s, s);
+        } else {
+          // Fallback: vector asteroid
+          ctx.fillStyle = '#555566';
+          ctx.beginPath();
+          ctx.arc(0, 0, r, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = '#333344';
+          ctx.lineWidth = 2;
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+    }
     
     // Draw obstacles
     for (const obs of this.currentZone.obstacles) {
@@ -468,11 +786,28 @@ export const World = {
       ctx.font = 'bold 12px Orbitron';
       ctx.textAlign = 'center';
       ctx.fillText('PORTAL', portal.x, portal.y + 5);
+
+      // Interaction hint (shown only when player is in range)
+      if (this.nearPortal === portal) {
+        ctx.font = 'bold 11px Orbitron';
+        if (portal.destination === 'next') {
+          ctx.fillText('E: CONTINUE', portal.x, portal.y - 50);
+          if (portal.allowHub) ctx.fillText('SHIFT+E: HUB', portal.x, portal.y - 34);
+        } else {
+          ctx.fillText('E: USE', portal.x, portal.y - 50);
+        }
+      }
     }
   },
   
   // Draw parallax background layers
-  drawParallaxBackground(ctx, screenW, screenH) {
+  drawParallax(ctx, screenW, screenH) {
+    if (!this.currentZone) return;
+
+    // New background stack (tile + fog + deco). If enabled and prepared, we skip legacy.
+    if (Background.draw(ctx, screenW, screenH, this.currentZone)) return;
+
+    // Legacy parallax fallback.
     if (!this.currentZone?.parallax) return;
     
     const parallax = this.currentZone.parallax;
@@ -518,17 +853,8 @@ export const World = {
     }
     
     ctx.globalAlpha = 1;
-    ctx.globalAlpha = 1;
-  }
-
-  drawParallaxForeground(ctx, screenW, screenH) {
-    if (!this.currentZone?.parallax) return;
     
-    const parallax = this.currentZone.parallax;
-    const camX = Camera.getX();
-    const camY = Camera.getY();
-    
-        // Layer 2: Nebula wisps
+    // Layer 2: Nebula wisps
     if (parallax.foreground.objects) {
       const fgOffsetX = camX * parallax.foreground.scrollSpeed;
       const fgOffsetY = camY * parallax.foreground.scrollSpeed;
@@ -546,12 +872,6 @@ export const World = {
       
       ctx.globalAlpha = 1;
     }
-  }
-
-  drawParallax(ctx, screenW, screenH) {
-    // Back-compat: some callers still use drawParallax()
-    this.drawParallaxBackground(ctx, screenW, screenH);
-    this.drawParallaxForeground(ctx, screenW, screenH);
   }
 };
 
